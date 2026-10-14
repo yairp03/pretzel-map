@@ -52,3 +52,11 @@ Coordinates are in millionths of a degree (about 11 cm).
   farmland, orchards, construction, railway land, military land, quarries
   or landfill.
 - Car one-way streets are not marked: a runner may run either way.
+- **The class `beach` is not an OpenStreetMap way.** OpenStreetMap has
+  no path along the water on most beaches, so the job makes one: the
+  coastline where it runs along a beach or sand (within 40 m), 12 m onto
+  the sand, gaps of up to 300 m between beaches bridged, in stretches of
+  200 m or more; and short `beach` segments joining it to the runnable
+  ways that reach the sand (each such way's node to the nearest point
+  within 120 m, one join every 150 m, never across a mapped cliff). Its
+  vertices are made by the job too. Lit is "no".

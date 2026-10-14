@@ -32,7 +32,9 @@ def runnable(t):
 # so the weights can change without rebuilding the map. Append only: a
 # file's numbers must keep their meaning.
 CLASSES = ['other', 'footway', 'path', 'pedestrian', 'track', 'cycleway', 'living_street', 'residential', 'service',
-           'unclassified', 'tertiary', 'tertiary_link', 'secondary', 'secondary_link', 'primary', 'primary_link', 'steps', 'road']
+           'unclassified', 'tertiary', 'tertiary_link', 'secondary', 'secondary_link', 'primary', 'primary_link', 'steps', 'road',
+           # Not an OpenStreetMap way: the waterline along a beach, made here (beach_paths) — runners run on the sand.
+           'beach']
 CLASS = {c: i for i, c in enumerate(CLASSES)}
 
 # Green: parks, gardens, grass, woods, water, beach — not open fields (meadow, scrub), which a runner doesn't find green.
@@ -51,16 +53,22 @@ class Reader(osmium.SimpleHandler):
         super().__init__()
         self.ways = []                 # (node ids, (lat, lon) of each, class, lit)
         self.green_areas, self.green_lines, self.avoid_areas = [], [], []
+        self.coast, self.beaches, self.cliffs = [], [], []   # for the path along the water (beach_paths)
 
     def way(self, w):
         t = dict(w.tags)
         if not t: return
         run, g, a = runnable(t), green(t, False), avoid(t)
-        if not (run or g or a): return
+        nat = t.get('natural')
+        shore = nat in ('coastline', 'beach', 'sand', 'cliff')
+        if not (run or g or a or shore): return
         try:
             pts = [(n.lat, n.lon) for n in w.nodes]
         except osmium.InvalidLocationError:
             return
+        if nat == 'coastline': self.coast.append(pts)
+        elif nat == 'cliff': self.cliffs.append(pts)
+        elif nat in ('beach', 'sand') and len(pts) > 3 and pts[0] == pts[-1]: self.beaches.append(pts)
         if run:
             self.ways.append(([n.ref for n in w.nodes], pts, CLASS.get(t['highway'], 0), LIT.get(t.get('lit'), 0)))
         closed = len(pts) > 3 and pts[0] == pts[-1]
@@ -74,10 +82,13 @@ class Reader(osmium.SimpleHandler):
         if a.from_way(): return
         t = dict(a.tags)
         g, v = green(t, True), avoid(t)
-        if not (g or v): return
+        sand = t.get('natural') in ('beach', 'sand')
+        if not (g or v or sand): return
         for ring in a.outer_rings():
             pts = [(n.lat, n.lon) for n in ring]
-            if len(pts) > 3: (self.green_areas if g else self.avoid_areas).append(pts)
+            if len(pts) > 3:
+                if g or v: (self.green_areas if g else self.avoid_areas).append(pts)
+                if sand: self.beaches.append(pts)
 
 
 def dist(lat1, lon1, lat2, lon2):
@@ -85,6 +96,110 @@ def dist(lat1, lon1, lat2, lon2):
     r = math.pi / 180
     x = np.sin((lat2 - lat1) * r / 2) ** 2 + np.cos(lat1 * r) * np.cos(lat2 * r) * np.sin((lon2 - lon1) * r / 2) ** 2
     return 2 * R * np.arcsin(np.sqrt(x))
+
+
+SHORE_STEP = 20     # metres between the beach path's points
+SHORE_IN = 12       # metres onto the sand from the waterline (OpenStreetMap draws the coastline with the land on its left)
+MIN_RUN = 200       # metres: shorter stretches of beach are not worth a path
+SHORE_GAP = 300     # metres of unmapped shore bridged between two beaches
+ACCESS = 120        # metres: how far a path ending on the sand may be joined to the beach path
+ACCESS_EVERY = 150  # metres along the beach path between two joins
+
+
+def _cross(p, q, a, b):
+    """Do segments p–q and a–b cross (as plane coordinates)?"""
+    d = lambda u, v, w: (v[0] - u[0]) * (w[1] - u[1]) - (v[1] - u[1]) * (w[0] - u[0])
+    return d(p, q, a) * d(p, q, b) < 0 and d(a, b, p) * d(a, b, q) < 0
+
+
+def beach_paths(coast, beaches, cliffs, ways, ras, next_id):
+    """
+    The path along the water on beaches, which OpenStreetMap doesn't have: on
+    Netanya's coast, from Argaman to Poleg beach, about 1.9 km of broken bits
+    in 3 km, so routes never went on the sand (the owner, 2026-10-15, chose to
+    add it, in normal routes). The coastline where it runs along a beach or
+    sand (within 40 m), moved 12 m onto the sand, gaps of up to 300 m between
+    beaches bridged, cut into stretches of 200 m or more, and joined to the runnable ways that reach the sand: each way's
+    node on the beach to the nearest point of the path within 120 m, one join
+    every 150 m, never across a mapped cliff. Returned as ways for graph():
+    (node ids, points, class, lit) — ids below zero, made here; lit = no.
+    """
+    if not coast or not beaches: return []
+    mask = ras.image(beaches, (), 2, 0)
+    on_sand = lambda la, lo: 0 <= (y := int((la - ras.la0) / ras.dy)) < ras.H and 0 <= (x := int((lo - ras.lo0) / ras.dx)) < ras.W and mask[y, x]
+    kx = 111320 * math.cos(math.radians(ras.la0))
+    plane = lambda la, lo: (lo * kx, la * 111320)
+    runs = []
+    for line in coast:
+        # Every SHORE_STEP metres along the coastline, each point moved SHORE_IN metres to its left.
+        pts, last = [], None
+        for (la1, lo1), (la2, lo2) in zip(line, line[1:]):
+            d = float(dist(la1, lo1, la2, lo2))
+            if d == 0: continue
+            ux, uy = (lo2 - lo1) * kx / d, (la2 - la1) * 111320 / d
+            for i in range(max(1, int(d // SHORE_STEP))):
+                f = i * SHORE_STEP / d
+                la, lo = la1 + (la2 - la1) * f, lo1 + (lo2 - lo1) * f
+                pts.append((la + ux * SHORE_IN / 111320, lo - uy * SHORE_IN / kx))
+            last = (la2 + ux * SHORE_IN / 111320, lo2 - uy * SHORE_IN / kx)
+        if last: pts.append(last)
+        # On the sand, with gaps of up to SHORE_GAP between two mapped beaches bridged: the beaches round
+        # Netanya's Poleg don't quite touch (200 m apart), and the path stopped there; a runner carries on.
+        sand = [on_sand(*p) for p in pts]
+        gap = SHORE_GAP // SHORE_STEP
+        i = 0
+        while i < len(sand):
+            if sand[i]: i += 1; continue
+            j = i
+            while j < len(sand) and not sand[j]: j += 1
+            if 0 < i and j < len(sand) and j - i <= gap: sand[i:j] = [True] * (j - i)
+            i = j
+        run = []
+        for p, ok in zip(pts + [None], sand + [False]):
+            if ok: run.append(p); continue
+            if len(run) * SHORE_STEP >= MIN_RUN: runs.append(run)
+            run = []
+
+    # The beach path's points by 100 m cell, to find the nearest; cliffs by cell too, to refuse a join across one.
+    cell = lambda x, y: (int(x // 100), int(y // 100))
+    near, cliff_cells = {}, {}
+    for r, run in enumerate(runs):
+        for i, p in enumerate(run): near.setdefault(cell(*plane(*p)), []).append((r, i))
+    for c in cliffs:
+        for a, b in zip(c, c[1:]):
+            pa, pb = plane(*a), plane(*b)
+            # Every cell the cliff passes through, sampled every 50 m.
+            n = max(1, int(math.hypot(pb[0] - pa[0], pb[1] - pa[1]) // 50))
+            for k in {cell(pa[0] + (pb[0] - pa[0]) * j / n, pa[1] + (pb[1] - pa[1]) * j / n) for j in range(n + 1)}:
+                cliff_cells.setdefault(k, []).append((pa, pb))
+    # Each node on the sand to its nearest point of the path (not across a cliff); then the nearest node in each stretch.
+    best = {}  # (run, stretch of ACCESS_EVERY) -> (distance, node id, node point, point index)
+    seen = set()
+    for ids, pts, _, _ in ways:
+        for nid, p in zip(ids, pts):
+            if nid in seen or not on_sand(*p): continue
+            seen.add(nid)
+            px, py = plane(*p); cx, cy = cell(px, py)
+            hits = []
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    for r, i in near.get((cx + dx, cy + dy), ()):
+                        qx, qy = plane(*runs[r][i]); d = math.hypot(qx - px, qy - py)
+                        if d > ACCESS: continue
+                        cells = {cell(px + (qx - px) * j / 4, py + (qy - py) * j / 4) for j in range(5)}
+                        if any(_cross((px, py), (qx, qy), a, b) for k in cells for a, b in cliff_cells.get(k, ())): continue
+                        hits.append((d, r, i))
+            if not hits: continue
+            d, r, i = min(hits)
+            key = (r, i * SHORE_STEP // ACCESS_EVERY)
+            if key not in best or d < best[key][0]: best[key] = (d, nid, p, i)
+    out, ids_of = [], []
+    for run in runs:
+        ids_of.append(list(range(next_id, next_id - len(run), -1))); next_id -= len(run)
+        out.append((ids_of[-1], run, CLASS['beach'], LIT['no']))
+    for (r, _), (_, nid, p, i) in best.items():
+        out.append(([nid, ids_of[r][i]], [p, runs[r][i]], CLASS['beach'], LIT['no']))
+    return out
 
 
 def graph(ways):
@@ -216,13 +331,15 @@ def build(pbf, out):
     r = Reader()
     r.apply_file(pbf, locations=True, idx='flex_mem')
     stamp = osmium.io.Reader(pbf, osmium.osm.osm_entity_bits.NOTHING).header().get('osmosis_replication_timestamp', '')
-    print(f'read: {len(r.ways)} ways, {len(r.green_areas)} green areas, {len(r.green_lines)} green lines, {len(r.avoid_areas)} avoided areas, {time.time() - t0:.0f}s', flush=True)
+    print(f'read: {len(r.ways)} ways, {len(r.green_areas)} green areas, {len(r.green_lines)} green lines, {len(r.avoid_areas)} avoided areas, {len(r.beaches)} beaches, {time.time() - t0:.0f}s', flush=True)
 
-    edges = graph(r.ways)
-    del r.ways
-    lats = np.array([p[0] for e in edges for p in (e[0][0], e[0][-1])])
-    lons = np.array([p[1] for e in edges for p in (e[0][0], e[0][-1])])
+    lats = np.array([p[0] for w in r.ways for p in (w[1][0], w[1][-1])])
+    lons = np.array([p[1] for w in r.ways for p in (w[1][0], w[1][-1])])
     ras = Raster(lats.min() - .01, lons.min() - .01, lats.max() + .01, lons.max() + .01)
+    shore = beach_paths(r.coast, r.beaches, r.cliffs, r.ways, ras, -1)
+    print(f'beach paths: {sum(1 for w in shore if len(w[0]) > 2)} stretches, {sum(1 for w in shore if len(w[0]) == 2)} joins, {time.time() - t0:.0f}s', flush=True)
+    edges = graph(r.ways + shore)
+    del r.ways
     print(f'graph: {len(edges)} segments; raster {ras.W}×{ras.H}, {time.time() - t0:.0f}s', flush=True)
 
     g = ras.share(ras.image(r.green_areas, r.green_lines, 1, 2), edges)

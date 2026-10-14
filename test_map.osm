@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- A small map drawn by hand for test_build.py: a park, a wood (a multipolygon), an industrial zone, and the ways through them. -->
+<!-- A small map drawn by hand for test_build.py: a park, a wood (a multipolygon), an industrial zone, and the ways through them; two beaches 200 m apart by the sea, a cliff, a path down to the sand and one behind the cliff. -->
 <osm version="0.6" generator="hand">
   <node id="1" version="1" lat="32.301" lon="34.861"/>
   <node id="2" version="1" lat="32.301" lon="34.8625"/>
@@ -30,6 +30,22 @@
   <node id="62" version="1" lat="32.3035" lon="34.8735"/>
   <node id="63" version="1" lat="32.3045" lon="34.8735"/>
   <node id="64" version="1" lat="32.3045" lon="34.8695"/>
+  <node id="70" version="1" lat="32.3080" lon="34.8520"/>
+  <node id="71" version="1" lat="32.3020" lon="34.8520"/>
+  <node id="72" version="1" lat="32.3085" lon="34.8515"/>
+  <node id="73" version="1" lat="32.3085" lon="34.8540"/>
+  <node id="74" version="1" lat="32.3015" lon="34.8540"/>
+  <node id="75" version="1" lat="32.3015" lon="34.8515"/>
+  <node id="82" version="1" lat="32.3040" lon="34.8540"/>
+  <node id="83" version="1" lat="32.3040" lon="34.8515"/>
+  <node id="84" version="1" lat="32.3058" lon="34.8515"/>
+  <node id="85" version="1" lat="32.3058" lon="34.8540"/>
+  <node id="76" version="1" lat="32.3065" lon="34.8560"/>
+  <node id="77" version="1" lat="32.3065" lon="34.8530"/>
+  <node id="78" version="1" lat="32.3038" lon="34.8560"/>
+  <node id="79" version="1" lat="32.3038" lon="34.8530"/>
+  <node id="80" version="1" lat="32.3025" lon="34.8526"/>
+  <node id="81" version="1" lat="32.3051" lon="34.8526"/>
   <way id="101" version="1"><nd ref="1"/><nd ref="2"/><nd ref="3"/><nd ref="4"/><tag k="highway" v="footway"/></way>
   <way id="102" version="1"><nd ref="5"/><nd ref="3"/><nd ref="6"/><tag k="highway" v="residential"/><tag k="lit" v="yes"/></way>
   <way id="103" version="1"><nd ref="10"/><nd ref="11"/><tag k="highway" v="path"/></way>
@@ -42,5 +58,11 @@
   <way id="110" version="1"><nd ref="41"/><nd ref="42"/><nd ref="43"/><nd ref="44"/><nd ref="41"/><tag k="leisure" v="park"/><tag k="name" v="A park"/></way>
   <way id="111" version="1"><nd ref="51"/><nd ref="52"/><nd ref="53"/><nd ref="54"/><nd ref="51"/></way>
   <way id="112" version="1"><nd ref="61"/><nd ref="62"/><nd ref="63"/><nd ref="64"/><nd ref="61"/><tag k="landuse" v="industrial"/></way>
+  <way id="113" version="1"><nd ref="70"/><nd ref="71"/><tag k="natural" v="coastline"/></way>
+  <way id="114" version="1"><nd ref="72"/><nd ref="73"/><nd ref="85"/><nd ref="84"/><nd ref="72"/><tag k="natural" v="beach"/></way>
+  <way id="115" version="1"><nd ref="76"/><nd ref="77"/><tag k="highway" v="footway"/></way>
+  <way id="116" version="1"><nd ref="78"/><nd ref="79"/><tag k="highway" v="footway"/></way>
+  <way id="117" version="1"><nd ref="80"/><nd ref="81"/><tag k="natural" v="cliff"/></way>
+  <way id="118" version="1"><nd ref="83"/><nd ref="82"/><nd ref="74"/><nd ref="75"/><nd ref="83"/><tag k="natural" v="beach"/></way>
   <relation id="201" version="1"><member type="way" ref="111" role="outer"/><tag k="type" v="multipolygon"/><tag k="natural" v="wood"/></relation>
 </osm>

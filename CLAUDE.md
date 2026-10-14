@@ -18,6 +18,10 @@ and its `lib/core/mapdata.ts` reads these files.
   Checked 2026-10-14 within 3 km of Netanya station: path length the same
   to 0.02%; green share 0.183 here against 0.174 there, avoided 0.163
   against 0.157 — the cells fall differently.
+- **One class is made here, not read from OpenStreetMap: `beach`**, the
+  path along the water on beaches (`beach_paths`; FORMAT.md). Added
+  2026-10-15 at the owner's word: routes never went on the sand between
+  Netanya's Argaman and Poleg beaches, which had no path there.
 - **Pages for this account redirects to yairp.me** (the account's own Pages
   site carries that domain), so this repo's Pages must keep its custom
   domain, map.pretzel.yairp.me (a CNAME to yairp03.github.io at Vercel's DNS).
