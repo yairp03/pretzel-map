@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A small map drawn by hand for test_build.py: a park, a wood (a multipolygon), an industrial zone, and the ways through them. -->
+<osm version="0.6" generator="hand">
+  <node id="1" version="1" lat="32.301" lon="34.861"/>
+  <node id="2" version="1" lat="32.301" lon="34.8625"/>
+  <node id="3" version="1" lat="32.301" lon="34.864"/>
+  <node id="4" version="1" lat="32.301" lon="34.867"/>
+  <node id="5" version="1" lat="32.303" lon="34.864"/>
+  <node id="6" version="1" lat="32.299" lon="34.864"/>
+  <node id="10" version="1" lat="32.31" lon="34.861"/>
+  <node id="11" version="1" lat="32.31" lon="34.864"/>
+  <node id="20" version="1" lat="32.304" lon="34.87"/>
+  <node id="21" version="1" lat="32.304" lon="34.873"/>
+  <node id="13" version="1" lat="32.298" lon="34.87"/>
+  <node id="30" version="1" lat="32.305" lon="34.861"/>
+  <node id="31" version="1" lat="32.305" lon="34.864"/>
+  <node id="32" version="1" lat="32.306" lon="34.861"/>
+  <node id="33" version="1" lat="32.306" lon="34.864"/>
+  <node id="34" version="1" lat="32.307" lon="34.861"/>
+  <node id="35" version="1" lat="32.307" lon="34.864"/>
+  <node id="41" version="1" lat="32.3005" lon="34.86"/>
+  <node id="42" version="1" lat="32.3005" lon="34.865"/>
+  <node id="43" version="1" lat="32.3015" lon="34.865"/>
+  <node id="44" version="1" lat="32.3015" lon="34.86"/>
+  <node id="51" version="1" lat="32.309" lon="34.86"/>
+  <node id="52" version="1" lat="32.309" lon="34.866"/>
+  <node id="53" version="1" lat="32.311" lon="34.866"/>
+  <node id="54" version="1" lat="32.311" lon="34.86"/>
+  <node id="61" version="1" lat="32.3035" lon="34.8695"/>
+  <node id="62" version="1" lat="32.3035" lon="34.8735"/>
+  <node id="63" version="1" lat="32.3045" lon="34.8735"/>
+  <node id="64" version="1" lat="32.3045" lon="34.8695"/>
+  <way id="101" version="1"><nd ref="1"/><nd ref="2"/><nd ref="3"/><nd ref="4"/><tag k="highway" v="footway"/></way>
+  <way id="102" version="1"><nd ref="5"/><nd ref="3"/><nd ref="6"/><tag k="highway" v="residential"/><tag k="lit" v="yes"/></way>
+  <way id="103" version="1"><nd ref="10"/><nd ref="11"/><tag k="highway" v="path"/></way>
+  <way id="104" version="1"><nd ref="20"/><nd ref="21"/><tag k="highway" v="service"/><tag k="lit" v="no"/></way>
+  <way id="105" version="1"><nd ref="13"/><nd ref="6"/><tag k="highway" v="footway"/></way>
+  <way id="106" version="1"><nd ref="4"/><nd ref="20"/><tag k="highway" v="cycleway"/></way>
+  <way id="107" version="1"><nd ref="30"/><nd ref="31"/><tag k="highway" v="motorway"/></way>
+  <way id="108" version="1"><nd ref="32"/><nd ref="33"/><tag k="highway" v="footway"/><tag k="foot" v="no"/></way>
+  <way id="109" version="1"><nd ref="34"/><nd ref="35"/><tag k="highway" v="service"/><tag k="access" v="private"/></way>
+  <way id="110" version="1"><nd ref="41"/><nd ref="42"/><nd ref="43"/><nd ref="44"/><nd ref="41"/><tag k="leisure" v="park"/><tag k="name" v="A park"/></way>
+  <way id="111" version="1"><nd ref="51"/><nd ref="52"/><nd ref="53"/><nd ref="54"/><nd ref="51"/></way>
+  <way id="112" version="1"><nd ref="61"/><nd ref="62"/><nd ref="63"/><nd ref="64"/><nd ref="61"/><tag k="landuse" v="industrial"/></way>
+  <relation id="201" version="1"><member type="way" ref="111" role="outer"/><tag k="type" v="multipolygon"/><tag k="natural" v="wood"/></relation>
+</osm>
