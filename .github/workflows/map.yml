@@ -23,8 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.13'
           cache: pip
@@ -35,13 +35,13 @@ jobs:
         run: |
           for url in https://download.geofabrik.de/asia/israel-and-palestine-latest.osm.pbf \
                      https://download.openstreetmap.fr/extracts/asia/israel.osm.pbf; do
-            if curl -fsSL --retry 3 -A 'pretzel-map (contact@yairp.me)' -o israel.osm.pbf "$url"; then echo "from $url"; break; fi
+            if curl -fsSL --retry 3 -A 'pretzel-map (contact@yairp.me)' -o israel.osm.pbf "$url"; then echo "MAP_SOURCE=$url" >> "$GITHUB_ENV"; echo "from $url"; break; fi
           done
           test -s israel.osm.pbf
           ls -l israel.osm.pbf
       - run: python build.py israel.osm.pbf site
       - run: python check.py site
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: site
 

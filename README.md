@@ -12,7 +12,7 @@ Geofabrik's extract, and published at **https://map.pretzel.yairp.me**:
 ```
 pip install -r requirements.txt
 python -m unittest -v                     # on test_map.osm, a small map drawn by hand
-python build.py israel.osm.pbf site       # all of Israel: about 2 minutes, 2.3 GB of memory, 16 MB out
+python build.py israel.osm.pbf site       # all of Israel: about 2 minutes, 2.3 GB of memory, 20 MB out
 python check.py site                      # what the job checks before publishing
 ```
 

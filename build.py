@@ -249,6 +249,8 @@ def build(pbf, out):
         total += len(gz)
     meta = {
         'format': FORMAT, 'tile': TILE, 'built': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'), 'osm': stamp,
+        # Where the extract came from (MAP_SOURCE, set by the job): Geofabrik's covers more than its fallback's, so check.py compares like with like.
+        'source': os.environ.get('MAP_SOURCE', os.path.basename(pbf)),
         'classes': CLASSES, 'attribution': '© OpenStreetMap contributors, ODbL — openstreetmap.org/copyright',
         'tiles': index,
     }

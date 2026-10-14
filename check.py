@@ -20,7 +20,8 @@ for name in new['tiles']:
 size = sum(v[0] for v in new['tiles'].values())
 print(f'{len(new["tiles"])} areas, {segments} segments, {size / 1e6:.1f} MB: all read back')
 
-# Always, even when the published map can't be read: the first build (2026-10-14) had 1,045 areas and 16.2 MB.
+# Always, even when the published map can't be read: the first builds (2026-10-14) had 1,201 areas and 20.0 MB from
+# Geofabrik, 1,045 and 16.2 MB from OpenStreetMap France's smaller extract, the fallback.
 if len(new['tiles']) < 950 or size < 14e6:
     sys.exit('the new map is smaller than Israel’s has ever been: not publishing it')
 
@@ -32,5 +33,7 @@ except Exception as e:
     sys.exit(0)
 live_size = sum(v[0] for v in live['tiles'].values())
 print(f'published now: {len(live["tiles"])} areas, {live_size / 1e6:.1f} MB, data of {live.get("osm")}')
-if len(new['tiles']) < 0.95 * len(live['tiles']) or size < 0.9 * live_size:
+if live.get('source') != new.get('source'):
+    print(f'built from {new.get("source")}, the published one from {live.get("source")}: not compared')
+elif len(new['tiles']) < 0.95 * len(live['tiles']) or size < 0.9 * live_size:
     sys.exit('the new map is much smaller than the published one: not publishing it')

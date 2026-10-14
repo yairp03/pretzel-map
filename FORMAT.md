@@ -11,7 +11,8 @@ contributors, ODbL.
   "format": 1,
   "tile": 0.05,
   "built": "2026-10-14T21:05:51Z",
-  "osm": "2026-10-13T00:55:40Z",
+  "osm": "2026-10-13T20:21:31Z",
+  "source": "https://download.geofabrik.de/asia/israel-and-palestine-latest.osm.pbf",
   "classes": ["other", "footway", "path", …],
   "attribution": "© OpenStreetMap contributors, ODbL — openstreetmap.org/copyright",
   "tiles": { "646_697": [66783, "3f2a9c01b7de"], … }
@@ -20,7 +21,7 @@ contributors, ODbL.
 
 - `tile`: an area is a square of this many degrees. The area holding
   latitude `lat`, longitude `lon` is `floor(lat / tile)_floor(lon / tile)`.
-- `osm`: when the extract's data was taken.
+- `osm`: when the extract's data was taken; `source`: where it came from.
 - `classes`: the kinds of path, by the number a segment carries. Only ever
   appended to, so a number keeps its meaning.
 - `tiles`: each area that has any runnable way: its file's size in bytes,
