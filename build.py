@@ -50,12 +50,16 @@ watery = lambda t: t.get('natural') in ('water', 'coastline', 'beach') or 'water
 AVOID = {'industrial', 'commercial', 'retail', 'farmland', 'orchard', 'construction', 'brownfield', 'railway', 'military', 'quarry', 'landfill'}
 avoid = lambda t: t.get('landuse') in AVOID
 LIT = {'yes': 1, 'no': 2}  # 0: the map doesn't say
+# A path that lies on a mapped beach is sand to a runner — unless it is paved, a boardwalk and the like.
+PAVED = {'paved', 'asphalt', 'concrete', 'concrete:plates', 'concrete:lanes', 'paving_stones', 'sett', 'cobblestone', 'wood', 'metal', 'compacted', 'fine_gravel'}
+SANDY = {'path', 'track', 'footway', 'other'}
 
 
 class Reader(osmium.SimpleHandler):
     def __init__(self):
         super().__init__()
         self.ways = []                 # (node ids, (lat, lon) of each, class, lit)
+        self.paved = []                # beside each way: its surface is paved (or wood…), or it is a path tagged sand: 'sand'
         self.green_areas, self.green_lines, self.avoid_areas = [], [], []
         self.coast, self.beaches, self.cliffs = [], [], []   # for the path along the water (beach_paths)
 
@@ -75,6 +79,7 @@ class Reader(osmium.SimpleHandler):
         elif nat in ('beach', 'sand') and len(pts) > 3 and pts[0] == pts[-1]: self.beaches.append(pts)
         if run:
             self.ways.append(([n.ref for n in w.nodes], pts, CLASS.get(t['highway'], 0), LIT.get(t.get('lit'), 0)))
+            self.paved.append('sand' if t.get('surface') == 'sand' else t.get('surface') in PAVED)
         closed = len(pts) > 3 and pts[0] == pts[-1]
         if g:
             if closed: self.green_areas.append(pts)
@@ -206,19 +211,22 @@ def beach_paths(coast, beaches, cliffs, ways, ras, next_id):
     return out
 
 
-def graph(ways):
+def graph(ways, src=None):
+    """src: a list filled, beside each segment, with the index of the way it came from."""
     """Segments between junctions and way ends; the points between them stay as the segment's shape."""
     uses = {}
     for ids, _, _, _ in ways:
         last = len(ids) - 1
         for i, n in enumerate(ids): uses[n] = uses.get(n, 0) + (2 if i in (0, last) else 1)
     edges = []  # (shape points, class, lit)
-    for ids, pts, cls, lit in ways:
+    for w, (ids, pts, cls, lit) in enumerate(ways):
         start = 0
         for i in range(1, len(ids)):
             if uses[ids[i]] > 1 or i == len(ids) - 1:
                 shape = pts[start:i + 1]
-                if any(p != shape[0] for p in shape): edges.append((shape, cls, lit))
+                if any(p != shape[0] for p in shape):
+                    edges.append((shape, cls, lit))
+                    if src is not None: src.append(w)
                 start = i
     return edges
 
@@ -387,10 +395,23 @@ def build(pbf, out, dem=None):
     ras = Raster(lats.min() - .01, lons.min() - .01, lats.max() + .01, lons.max() + .01)
     shore = beach_paths(r.coast, r.beaches, r.cliffs, r.ways, ras, -1)
     print(f'beach paths: {sum(1 for w in shore if len(w[0]) > 2)} stretches, {sum(1 for w in shore if len(w[0]) == 2)} joins, {time.time() - t0:.0f}s', flush=True)
-    edges = graph(r.ways + shore)
+    src = []
+    edges = graph(r.ways + shore, src)
+    paved = r.paved + [False] * len(shore)
     del r.ways
     print(f'graph: {len(edges)} segments; raster {ras.W}×{ras.H}, {time.time() - t0:.0f}s', flush=True)
 
+    # Paths over the sand (the owner, 2026-10-17: a path along the beach by Wingate wasn't "on the sand"): a path, track or
+    # footway 80% or more on a mapped beach or sand, not paved, is the class 'beach' — slower, unlit unless tagged, said and dashed.
+    if r.beaches:
+        on_sand = ras.share(ras.image(r.beaches), edges)
+        moved = 0
+        for k, (shape, cls, lit) in enumerate(edges):
+            p = paved[src[k]]
+            if cls != CLASS['beach'] and (p == 'sand' or (CLASSES[cls] in SANDY and not p and on_sand[k] >= 0.8)):
+                edges[k] = (shape, CLASS['beach'], lit if lit else LIT['no'])
+                moved += 1
+        print(f'paths on the sand: {moved}, {time.time() - t0:.0f}s', flush=True)
     g = ras.share(ras.image(r.green_areas, r.green_lines, 1, 2), edges)
     a = ras.share(ras.image(r.avoid_areas), edges)
     print(f'green and avoided shares, {time.time() - t0:.0f}s', flush=True)

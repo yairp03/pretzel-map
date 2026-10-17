@@ -22,6 +22,10 @@ and its `lib/core/mapdata.ts` reads these files.
   path along the water on beaches (`beach_paths`; FORMAT.md). Added
   2026-10-15 at the owner's word: routes never went on the sand between
   Netanya's Argaman and Poleg beaches, which had no path there.
+  It also takes in OpenStreetMap's own paths over the sand (2026-10-17):
+  a path, track or footway 80% or more on a mapped beach or sand and not
+  paved, or tagged `surface=sand`, is `beach` — about 22,000 segments,
+  dunes included. A path by Wingate along the water wasn't "on the sand".
 - **Pages for this account redirects to yairp.me** (the account's own Pages
   site carries that domain), so this repo's Pages must keep its custom
   domain, map.pretzel.yairp.me (a CNAME to yairp03.github.io at Vercel's DNS).

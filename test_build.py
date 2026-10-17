@@ -38,14 +38,14 @@ class Built(unittest.TestCase):
 
     def test_only_runnable_ways(self):
         # The motorway, a footway marked foot=no and a private service road are left out; so is every area outline.
-        self.assertEqual(sum(1 for s in self.seg.values() if s['cls'] != CLASS['beach']), 10)
+        self.assertEqual(sum(1 for s in self.seg.values() if s['cls'] != CLASS['beach']), 11)
 
     def beach(self):
         return [(k, s) for k, s in self.seg.items() if s['cls'] == CLASS['beach']]
 
     def test_beach_path_along_the_water(self):
         # The coastline (land on its left, so east here) along the beach, moved 12 m onto the sand: green, and unlit.
-        along = [s for k, s in self.beach() if abs(k[0] - k[2]) > 0.0005]
+        along = [s for k, s in self.beach() if abs(k[0] - k[2]) > 0.0005 and abs(k[1] - 34.8521) < 0.0002]  # the waterline's, not the path on the sand
         self.assertTrue(along)
         for s in along:
             self.assertEqual(s['lit'], 2); self.assertGreater(s['green'], 200)
@@ -57,6 +57,13 @@ class Built(unittest.TestCase):
     def test_beach_path_joined_to_a_path_down_to_the_sand(self):
         joins = [k for k, s in self.beach() if (32.3065, 34.853) in (k[:2], k[2:])]
         self.assertEqual(len(joins), 1)
+
+    def test_a_path_on_the_sand_is_sand_a_paved_one_is_not(self):
+        on_sand = self.find((32.307, 34.8538), (32.3082, 34.8538))
+        self.assertEqual((on_sand['cls'], on_sand['lit']), (CLASS['beach'], 2))
+        self.assertEqual(self.find((32.307, 34.8539), (32.3082, 34.8539))['cls'], CLASS['footway'])
+        # The path down to the sand, mostly off it, stays a footway.
+        self.assertEqual(self.find((32.3065, 34.856), (32.3065, 34.853))['cls'], CLASS['footway'])
 
     def test_no_join_across_a_cliff(self):
         self.assertFalse([k for k, s in self.beach() if (32.3038, 34.853) in (k[:2], k[2:])])

@@ -60,3 +60,7 @@ Coordinates are in millionths of a degree (about 11 cm).
   ways that reach the sand (each such way's node to the nearest point
   within 120 m, one join every 150 m, never across a mapped cliff). Its
   vertices are made by the job too. Lit is "no".
+  Also `beach`: an OpenStreetMap path, track or footway lying 80% or more
+  on a mapped beach or sand and not paved (`surface` asphalt, paving
+  stones, wood and the like), or any path tagged `surface=sand` — it is on
+  the sand, whatever its kind. Its lit stays as tagged, else "no".
