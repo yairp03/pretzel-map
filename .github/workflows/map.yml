@@ -39,7 +39,24 @@ jobs:
           done
           test -s israel.osm.pbf
           ls -l israel.osm.pbf
-      - run: python build.py israel.osm.pbf site
+      # Heights for climbs (heights.py, HEIGHTS.md): Copernicus GLO-30's 1° tiles over Israel, from AWS's open data.
+      # They don't change, so they are kept in the job's cache, not fetched every week.
+      - uses: actions/cache@v4
+        with:
+          path: dem
+          key: copernicus-glo30-israel-v1
+      - name: Height tiles (once; kept in the cache)
+        run: |
+          mkdir -p dem
+          for lat in 29 30 31 32 33; do for lon in 034 035; do
+            f=dem/N${lat}E${lon}.tif
+            [ -s "$f" ] && continue
+            curl -fsSL --retry 3 -A 'pretzel-map (contact@yairp.me)' -o "$f" \
+              "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N${lat}_00_E${lon}_00_DEM/Copernicus_DSM_COG_10_N${lat}_00_E${lon}_00_DEM.tif" || rm -f "$f"
+          done; done
+          ls -l dem
+          test "$(ls dem/*.tif | wc -l)" -ge 8
+      - run: python build.py israel.osm.pbf site dem
       - run: python check.py site
       - uses: actions/upload-pages-artifact@v4
         with:

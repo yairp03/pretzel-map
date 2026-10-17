@@ -2,7 +2,8 @@
 where segments break, how green and avoided they are, and which area holds
 each — read back as the phone reads them (decode)."""
 import gzip, json, os, tempfile, unittest
-from build import CLASS, build, decode
+from build import CLASS, build, decode, decode_heights
+from heights import Heights
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -11,7 +12,8 @@ class Built(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.dir = tempfile.mkdtemp()
-        build(os.path.join(HERE, 'test_map.osm'), cls.dir)
+        # A made-up slope for the heights: 1 m per 0.0001° east (about 9.4 m), flat north-south.
+        build(os.path.join(HERE, 'test_map.osm'), cls.dir, Heights.from_function(lambda la, lo: (lo - 34.85) * 10000))
         with open(f'{cls.dir}/index.json') as f: cls.index = json.load(f)
         cls.areas = {}
         for name in cls.index['tiles']:
@@ -87,6 +89,21 @@ class Built(unittest.TestCase):
         self.assertEqual(self.find((32.301, 34.864), (32.299, 34.864))['area'], '646_697')
         # Starts in 645, ends at the same vertex: the phone joins the two by its coordinates.
         self.assertEqual(self.find((32.298, 34.87), (32.299, 34.864))['area'], '645_697')
+
+
+    def test_heights_beside_each_area(self):
+        self.assertEqual(sorted(self.index['heights']['tiles']), sorted(self.index['tiles']))
+        self.assertIn('Copernicus', self.index['heights']['attribution'])
+
+    def test_climbs_match_the_slope_and_the_map_file(self):
+        for name in self.index['tiles']:
+            with open(f'{self.dir}/t/{name}.bin.gz', 'rb') as f: row, col, verts, segs = decode(gzip.decompress(f.read()))
+            with open(f'{self.dir}/h/{name}.bin.gz', 'rb') as f: hrow, hcol, z, climbs = decode_heights(gzip.decompress(f.read()))
+            self.assertEqual((row, col, len(verts), len(segs)), (hrow, hcol, len(z), len(climbs)))
+            for v, h in zip(verts, z): self.assertAlmostEqual(h / 10, (v[1] / 1e6 - 34.85) * 10000, delta=0.2)
+            for s, (up, down) in zip(segs, climbs):
+                rise = z[s['b']] - z[s['a']]   # straight east or west here, so the climb is the rise one way
+                self.assertAlmostEqual(up - down, rise, delta=2)
 
 
 if __name__ == '__main__':

@@ -6,7 +6,7 @@ extract would otherwise replace the whole country's map with less of it.
     python3 check.py <out dir> [live index URL]
 """
 import gzip, json, sys, urllib.request
-from build import decode
+from build import decode, decode_heights
 
 out = sys.argv[1]
 live_url = sys.argv[2] if len(sys.argv) > 2 else 'https://map.pretzel.yairp.me/index.json'
@@ -17,8 +17,13 @@ for name in new['tiles']:
     with open(f'{out}/t/{name}.bin.gz', 'rb') as f: row, col, verts, segs = decode(gzip.decompress(f.read()))
     assert f'{row}_{col}' == name, f'{name} says it is {row}_{col}'
     segments += len(segs)
+    # Its heights, when there are any: the same area, the same vertices and segments (the phone pairs them by position).
+    if 'heights' in new:
+        assert name in new['heights']['tiles'], f'{name} has no heights'
+        with open(f'{out}/h/{name}.bin.gz', 'rb') as f: hrow, hcol, z, climbs = decode_heights(gzip.decompress(f.read()))
+        assert (hrow, hcol, len(z), len(climbs)) == (row, col, len(verts), len(segs)), f'{name}: heights don’t match the map'
 size = sum(v[0] for v in new['tiles'].values())
-print(f'{len(new["tiles"])} areas, {segments} segments, {size / 1e6:.1f} MB: all read back')
+print(f'{len(new["tiles"])} areas, {segments} segments, {size / 1e6:.1f} MB: all read back' + (', heights too' if 'heights' in new else ''))
 
 # Always, even when the published map can't be read: the first builds (2026-10-14) had 1,201 areas and 20.0 MB from
 # Geofabrik, 1,045 and 16.2 MB from OpenStreetMap France's smaller extract, the fallback.

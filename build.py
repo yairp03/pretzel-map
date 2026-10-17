@@ -6,7 +6,11 @@ whether it is lit.
 
     python3 -I build.py <extract.osm.pbf> <out dir>
 
-Writes <out>/index.json and <out>/t/<row>_<col>.bin.gz (format: FORMAT.md).
+    python3 -I build.py <extract.osm.pbf> <out dir> <heights dir>
+
+Writes <out>/index.json and <out>/t/<row>_<col>.bin.gz (format: FORMAT.md);
+with a folder of height tiles (heights.py), also <out>/h/<row>_<col>.bin.gz,
+each area's heights and climbs (HEIGHTS.md).
 Every way is kept as the feasibility test kept it (Pretzel's
 scripts/feasibility: loops.mjs and pbf2json.py), so routes come out the same.
 """
@@ -298,6 +302,49 @@ def encode(row, col, edges):
     return bytes(out)
 
 
+HEIGHTS_FORMAT = 1
+
+def encode_heights(row, col, edges, heights):
+    """
+    One area's heights (HEIGHTS.md), its vertices and segments in the same
+    order as its map file (encode): each vertex's height, each segment's
+    climb forward and back. heights: (start, end, up, down) per edge, in dm.
+    """
+    vid, verts = {}, []
+    for (shape, *_), (z0, z1, _, _) in zip(edges, heights):
+        for p, z in ((shape[0], z0), (shape[-1], z1)):
+            if p not in vid: vid[p] = len(verts); verts.append(z)
+    out = bytearray(b'PZH' + bytes([HEIGHTS_FORMAT]))
+    varint(out, row); varint(out, col); varint(out, len(verts))
+    prev = 0
+    for z in verts:
+        varint(out, zigzag(z - prev)); prev = z
+    varint(out, len(edges))
+    for _, _, up, down in heights:
+        varint(out, up); varint(out, down)
+    return bytes(out)
+
+
+def decode_heights(raw):
+    """One area's heights back: (row, col, vertex heights, [(up, down)]) in dm — for the tests and the check."""
+    assert raw[:3] == b'PZH' and raw[3] == HEIGHTS_FORMAT, 'not a heights file of this format'
+    i = 4
+    def uv():
+        nonlocal i
+        v, sh = 0, 0
+        while True:
+            b = raw[i]; i += 1; v |= (b & 0x7F) << sh; sh += 7
+            if b < 0x80: return v
+    zz = lambda: (lambda v: -(v + 1) // 2 if v & 1 else v // 2)(uv())
+    row, col = uv(), uv()
+    z, verts = 0, []
+    for _ in range(uv()):
+        z += zz(); verts.append(z)
+    segs = [(uv(), uv()) for _ in range(uv())]
+    assert i == len(raw), 'bytes left over'
+    return row, col, verts, segs
+
+
 def decode(raw):
     """One area's file back into (row, col, vertices, segments): what the phone reads, for the tests and the check."""
     assert raw[:3] == b'PZM' and raw[3] == FORMAT, 'not a map file of this format'
@@ -325,8 +372,10 @@ def decode(raw):
     return row, col, verts, segs
 
 
-def build(pbf, out):
+def build(pbf, out, dem=None):
+    """dem: a folder of height tiles, or a Heights (tests); none, no heights files."""
     import os
+    from heights import ATTRIBUTION, Heights, climbs
     t0 = time.time()
     r = Reader()
     r.apply_file(pbf, locations=True, idx='flex_mem')
@@ -345,15 +394,23 @@ def build(pbf, out):
     g = ras.share(ras.image(r.green_areas, r.green_lines, 1, 2), edges)
     a = ras.share(ras.image(r.avoid_areas), edges)
     print(f'green and avoided shares, {time.time() - t0:.0f}s', flush=True)
+    if dem is not None:
+        H = Heights.from_dir(dem) if isinstance(dem, str) else dem
+        up, down, z0, z1 = climbs(H, edges)
+        print(f'heights: {len(H.tiles) or "a function"}; climbs, {time.time() - t0:.0f}s', flush=True)
 
     tiles = {}
-    for (shape, cls, lit), gs, av in zip(edges, g, a):
+    tiles_h = {}
+    for k, ((shape, cls, lit), gs, av) in enumerate(zip(edges, g, a)):
         pts = [(round(la * Q), round(lo * Q)) for la, lo in shape]
         la, lo = np.array([p[0] for p in shape]), np.array([p[1] for p in shape])
         dm = max(1, round(float(dist(la[:-1], lo[:-1], la[1:], lo[1:]).sum()) * 10))
         # An area holds the segments that start in it; the phone joins areas by the vertices' coordinates.
         key = (math.floor(shape[0][0] / TILE), math.floor(shape[0][1] / TILE))
         tiles.setdefault(key, []).append((pts, cls, lit, round(gs * 255), round(av * 255), dm))
+        if dem is not None:
+            # In decimetres, beside the edge in its area's list, so both files keep one order.
+            tiles_h.setdefault(key, []).append((round(z0[k] * 10), round(z1[k] * 10), round(up[k] * 10), round(down[k] * 10)))
 
     os.makedirs(f'{out}/t', exist_ok=True)
     index = {}
@@ -364,6 +421,14 @@ def build(pbf, out):
         with open(f'{out}/t/{row}_{col}.bin.gz', 'wb') as f: f.write(gz)
         index[f'{row}_{col}'] = [len(gz), hashlib.sha256(raw).hexdigest()[:12]]
         total += len(gz)
+    index_h = {}
+    if dem is not None:
+        os.makedirs(f'{out}/h', exist_ok=True)
+        for (row, col), es in sorted(tiles.items()):
+            raw = encode_heights(row, col, es, tiles_h[(row, col)])
+            gz = gzip.compress(raw, 9, mtime=0)
+            with open(f'{out}/h/{row}_{col}.bin.gz', 'wb') as f: f.write(gz)
+            index_h[f'{row}_{col}'] = [len(gz), hashlib.sha256(raw).hexdigest()[:12]]
     meta = {
         'format': FORMAT, 'tile': TILE, 'built': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'), 'osm': stamp,
         # Where the extract came from (MAP_SOURCE, set by the job): Geofabrik's covers more than its fallback's, so check.py compares like with like.
@@ -371,10 +436,13 @@ def build(pbf, out):
         'classes': CLASSES, 'attribution': '© OpenStreetMap contributors, ODbL — openstreetmap.org/copyright',
         'tiles': index,
     }
+    if index_h:
+        # A separate file per area under its own credit: the map is OpenStreetMap's; the heights are Copernicus's.
+        meta['heights'] = {'format': HEIGHTS_FORMAT, 'attribution': ATTRIBUTION, 'tiles': index_h}
     with open(f'{out}/index.json', 'w') as f: json.dump(meta, f, separators=(',', ':'))
     big = sorted(index.items(), key=lambda kv: -kv[1][0])[:3]
     print(f'wrote {len(index)} areas, {total / 1e6:.1f} MB in all; largest {[(k, round(v[0] / 1e3)) for k, v in big]} KB; {time.time() - t0:.0f}s')
 
 
 if __name__ == '__main__':
-    build(sys.argv[1], sys.argv[2])
+    build(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)
