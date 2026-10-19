@@ -26,6 +26,15 @@ and its `lib/core/mapdata.ts` reads these files.
   a path, track or footway 80% or more on a mapped beach or sand and not
   paved, or tagged `surface=sand`, is `beach` — about 22,000 segments,
   dunes included. A path by Wingate along the water wasn't "on the sand".
+- **Street lights from Tel Aviv-Yafo** (`lights.py`; the owner, 2026-10-19,
+  under the city's open data terms: share and adapt for any purpose, with
+  credit — the layer is on its map server, not in its open data catalogue).
+  Poles only ever light an untagged way: in Tel Aviv 45% of untagged paths
+  have poles along them against 14% of those tagged unlit, while streets
+  tagged lit have them along only 70% (lights on the electricity company's
+  poles aren't in the layer) — no pole is not dark. Credited in
+  `index.json` and on the app's About. A week the city doesn't answer, the
+  job builds with the last copy in its cache.
 - **Pages for this account redirects to yairp.me** (the account's own Pages
   site carries that domain), so this repo's Pages must keep its custom
   domain, map.pretzel.yairp.me (a CNAME to yairp03.github.io at Vercel's DNS).

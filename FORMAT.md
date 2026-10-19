@@ -27,6 +27,11 @@ contributors, ODbL.
 - `tiles`: each area that has any runnable way: its file's size in bytes,
   and a hash of its content. A phone downloads an area again only when the
   hash changes.
+- `lights` (when street lights were used): `{"attribution": …}`, their
+  source's credit. A segment's lit is then also 1 where OpenStreetMap
+  doesn't say and Tel Aviv-Yafo's light poles stand within 20 m of 60% of
+  it, every 10 m (`lights.py`); a tag of OpenStreetMap's is never
+  overruled, and no segment is made unlit by them.
 
 ## `t/<row>_<col>.bin.gz`
 

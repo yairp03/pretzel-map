@@ -6,7 +6,7 @@ whether it is lit.
 
     python3 -I build.py <extract.osm.pbf> <out dir>
 
-    python3 -I build.py <extract.osm.pbf> <out dir> <heights dir>
+    python3 build.py <extract.osm.pbf> <out dir> <heights dir> [<street lights.json>]
 
 Writes <out>/index.json and <out>/t/<row>_<col>.bin.gz (format: FORMAT.md);
 with a folder of height tiles (heights.py), also <out>/h/<row>_<col>.bin.gz,
@@ -380,9 +380,14 @@ def decode(raw):
     return row, col, verts, segs
 
 
-def build(pbf, out, dem=None):
-    """dem: a folder of height tiles, or a Heights (tests); none, no heights files."""
+def build(pbf, out, dem=None, lights=None):
+    """
+    dem: a folder of height tiles, or a Heights (tests); none, no heights
+    files. lights: street-light poles (lights.py), a file of them or a list
+    of (lat, lon); none, the map's own lit tags only.
+    """
     import os
+    import lights as street_lights
     from heights import ATTRIBUTION, Heights, climbs
     t0 = time.time()
     r = Reader()
@@ -412,6 +417,11 @@ def build(pbf, out, dem=None):
                 edges[k] = (shape, CLASS['beach'], lit if lit else LIT['no'])
                 moved += 1
         print(f'paths on the sand: {moved}, {time.time() - t0:.0f}s', flush=True)
+    # Lit where the map doesn't say and street-light poles stand along the way (lights.py).
+    if lights is not None:
+        poles = json.load(open(lights)) if isinstance(lights, str) else lights
+        edges, lit_now = street_lights.lit_by_poles(edges, poles, 0, LIT['yes'])
+        print(f'lit by poles: {lit_now} segments, of {len(poles)} poles, {time.time() - t0:.0f}s', flush=True)
     g = ras.share(ras.image(r.green_areas, r.green_lines, 1, 2), edges)
     a = ras.share(ras.image(r.avoid_areas), edges)
     print(f'green and avoided shares, {time.time() - t0:.0f}s', flush=True)
@@ -460,10 +470,12 @@ def build(pbf, out, dem=None):
     if index_h:
         # A separate file per area under its own credit: the map is OpenStreetMap's; the heights are Copernicus's.
         meta['heights'] = {'format': HEIGHTS_FORMAT, 'attribution': ATTRIBUTION, 'tiles': index_h}
+    if lights is not None:
+        meta['lights'] = {'attribution': street_lights.ATTRIBUTION}
     with open(f'{out}/index.json', 'w') as f: json.dump(meta, f, separators=(',', ':'))
     big = sorted(index.items(), key=lambda kv: -kv[1][0])[:3]
     print(f'wrote {len(index)} areas, {total / 1e6:.1f} MB in all; largest {[(k, round(v[0] / 1e3)) for k, v in big]} KB; {time.time() - t0:.0f}s')
 
 
 if __name__ == '__main__':
-    build(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None)
+    build(sys.argv[1], sys.argv[2], sys.argv[3] if len(sys.argv) > 3 else None, sys.argv[4] if len(sys.argv) > 4 else None)

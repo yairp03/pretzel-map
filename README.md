@@ -12,10 +12,14 @@ Geofabrik's extract, and published at **https://map.pretzel.yairp.me**:
 ```
 pip install -r requirements.txt
 python -m unittest -v                     # on test_map.osm, a small map drawn by hand
-python build.py israel.osm.pbf site       # all of Israel: about 2 minutes, 2.3 GB of memory, 20 MB out
+python lights.py lights.json              # Tel Aviv-Yafo's street-light poles (lights.py)
+python build.py israel.osm.pbf site dem lights.json   # all of Israel, with heights (HEIGHTS.md) and lights: 20 MB out
 python check.py site                      # what the job checks before publishing
 ```
 
 Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright),
 available under the Open Database License (ODbL); the files here are a
 database derived from it, under the same licence.
+
+Street lights in Tel Aviv-Yafo: Tel Aviv-Yafo Municipality, open data
+(`lights.py`), used only to mark ways lit where OpenStreetMap doesn't say.

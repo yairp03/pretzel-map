@@ -115,3 +115,40 @@ class Built(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class Lights(unittest.TestCase):
+    """Street-light poles (lights.py): a way the map doesn't light-tag, with poles along it, is lit; a tag is never overruled."""
+
+    # Poles every ~28 m along the untagged way 32.301, 34.861–34.864, and along the way tagged unlit.
+    POLES = [(32.30101, 34.861 + i * 0.0003) for i in range(11)] + [(32.30401, 34.87 + i * 0.0003) for i in range(11)]
+
+    @classmethod
+    def setUpClass(cls):
+        cls.dir = tempfile.mkdtemp()
+        build(os.path.join(HERE, 'test_map.osm'), cls.dir, None, cls.POLES)
+        with open(f'{cls.dir}/index.json') as f: cls.index = json.load(f)
+        cls.seg = {}
+        for name in cls.index['tiles']:
+            with open(f'{cls.dir}/t/{name}.bin.gz', 'rb') as f: row, col, verts, segs = decode(gzip.decompress(f.read()))
+            for s in segs:
+                a, b = verts[s['a']], verts[s['b']]
+                cls.seg[(a[0] / 1e6, a[1] / 1e6, b[0] / 1e6, b[1] / 1e6)] = s
+
+    def test_untagged_with_poles_is_lit(self):
+        self.assertEqual(self.seg[(32.301, 34.861, 32.301, 34.864)]['lit'], 1)
+
+    def test_a_tag_stays(self):
+        self.assertEqual(self.seg[(32.304, 34.87, 32.304, 34.873)]['lit'], 2)
+        self.assertEqual(self.seg[(32.303, 34.864, 32.301, 34.864)]['lit'], 1)
+
+    def test_credited(self):
+        self.assertIn('Tel Aviv-Yafo', self.index['lights']['attribution'])
+
+    def test_a_pole_at_one_end_is_not_enough(self):
+        from lights import lit_by_poles
+        way = [((32.3, 34.86), (32.3, 34.863), (32.3, 34.866)), 1, 0]
+        out, changed = lit_by_poles([tuple(way)], [(32.3, 34.86)])
+        self.assertEqual((out[0][2], changed), (0, 0))
+        out, changed = lit_by_poles([tuple(way)], [(32.30005, 34.86 + i * 0.0002) for i in range(31)])
+        self.assertEqual((out[0][2], changed), (1, 1))
