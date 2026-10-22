@@ -2,7 +2,7 @@
 where segments break, how green and avoided they are, and which area holds
 each — read back as the phone reads them (decode)."""
 import gzip, json, os, tempfile, unittest
-from build import CLASS, build, decode, decode_heights
+from build import CLASS, build, decode, decode_extras, decode_heights
 from heights import Heights
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -116,6 +116,31 @@ class Built(unittest.TestCase):
 if __name__ == '__main__':
     unittest.main()
 
+
+    def test_stops(self):
+        """Lights and crossings per segment, in halves: whole inside it, half at each end (EXTRAS.md)."""
+        stops = {}
+        for name, (row, col, verts, segs) in self.areas.items():
+            with open(f'{self.dir}/x/{name}.bin.gz', 'rb') as f: xr, xc, stopped, _ = decode_extras(gzip.decompress(f.read()))
+            self.assertEqual((xr, xc, len(stopped)), (row, col, len(segs)))
+            for s, st in zip(segs, stopped):
+                a, b = verts[s['a']], verts[s['b']]
+                stops[(a[0] / 1e6, a[1] / 1e6, b[0] / 1e6, b[1] / 1e6)] = st
+        # The light at node 2, inside the footway's first segment (1–3); the crossing at node 3, a junction: half to each of its four.
+        self.assertEqual(stops[(32.301, 34.861, 32.301, 34.864)], (2, 1))
+        self.assertEqual(stops[(32.301, 34.864, 32.301, 34.867)], (0, 1))
+        self.assertEqual(stops[(32.303, 34.864, 32.301, 34.864)], (0, 1))
+        self.assertEqual(stops[(32.301, 34.864, 32.299, 34.864)], (0, 1))
+        self.assertEqual(stops[(32.31, 34.861, 32.31, 34.864)], (0, 0))
+        self.assertEqual(self.index['extras']['format'], 1)
+        self.assertEqual(set(self.index['extras']['tiles']), set(self.index['tiles']))
+
+    def test_places(self):
+        """Water and toilets anyone may use; toilets mapped as a building, at its middle."""
+        places = []
+        for name in self.index['tiles']:
+            with open(f'{self.dir}/x/{name}.bin.gz', 'rb') as f: places += decode_extras(gzip.decompress(f.read()))[3]
+        self.assertEqual(sorted(places), [(1, 32302200, 34862100), (2, 32302100, 34865100)])
 
 class Lights(unittest.TestCase):
     """Street-light poles (lights.py): a way the map doesn't light-tag, with poles along it, is lit; a tag is never overruled."""

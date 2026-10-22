@@ -10,7 +10,8 @@ whether it is lit.
 
 Writes <out>/index.json and <out>/t/<row>_<col>.bin.gz (format: FORMAT.md);
 with a folder of height tiles (heights.py), also <out>/h/<row>_<col>.bin.gz,
-each area's heights and climbs (HEIGHTS.md).
+each area's heights and climbs (HEIGHTS.md); and always <out>/x/<row>_<col>.bin.gz,
+each area's traffic lights and crossings, water and toilets (EXTRAS.md).
 Every way is kept as the feasibility test kept it (Pretzel's
 scripts/feasibility: loops.mjs and pbf2json.py), so routes come out the same.
 """
@@ -21,6 +22,7 @@ import osmium
 from PIL import Image, ImageDraw, ImageFilter
 
 FORMAT = 1
+EXTRAS_FORMAT = 1    # EXTRAS.md: stops per segment, and places
 TILE = 0.05          # degrees: about 5.5 km north–south, 4.7 km east–west here
 Q = 1e6              # coordinates kept to a millionth of a degree, about 11 cm
 CELL = 20            # metres: the green raster, as the feasibility test had it
@@ -50,6 +52,19 @@ watery = lambda t: t.get('natural') in ('water', 'coastline', 'beach') or 'water
 AVOID = {'industrial', 'commercial', 'retail', 'farmland', 'orchard', 'construction', 'brownfield', 'railway', 'military', 'quarry', 'landfill'}
 avoid = lambda t: t.get('landuse') in AVOID
 LIT = {'yes': 1, 'no': 2}  # 0: the map doesn't say
+# Stops on the way (EXTRAS.md): a traffic light, at a junction or a crossing, and a crossing without one.
+LIGHT, CROSSING = 2, 1
+def stop(t):
+    if t.get('highway') == 'traffic_signals' or (t.get('highway') == 'crossing' and (t.get('crossing') == 'traffic_signals' or t.get('crossing:signals') == 'yes')): return LIGHT
+    if t.get('highway') == 'crossing' and t.get('crossing') != 'no': return CROSSING
+    return 0
+# Places along a run (EXTRAS.md): drinking water and toilets anyone may use.
+WATER, TOILETS = 1, 2
+def place(t):
+    if t.get('access') in ('private', 'no', 'customers'): return 0
+    if t.get('amenity') == 'drinking_water' or (t.get('amenity') == 'fountain' and t.get('drinking_water') == 'yes'): return WATER
+    if t.get('amenity') == 'toilets': return TOILETS
+    return 0
 # A path that lies on a mapped beach is sand to a runner — unless it is paved, a boardwalk and the like.
 PAVED = {'paved', 'asphalt', 'concrete', 'concrete:plates', 'concrete:lanes', 'paving_stones', 'sett', 'cobblestone', 'wood', 'metal', 'compacted', 'fine_gravel'}
 SANDY = {'path', 'track', 'footway', 'other'}
@@ -62,10 +77,28 @@ class Reader(osmium.SimpleHandler):
         self.paved = []                # beside each way: its surface is paved (or wood…), or it is a path tagged sand: 'sand'
         self.green_areas, self.green_lines, self.avoid_areas = [], [], []
         self.coast, self.beaches, self.cliffs = [], [], []   # for the path along the water (beach_paths)
+        self.stops = {}                # node id: LIGHT or CROSSING
+        self.places = []               # (kind, lat, lon)
+
+    def node(self, n):
+        if not n.tags: return
+        t = dict(n.tags)
+        k = stop(t)
+        if k: self.stops[n.id] = k
+        k = place(t)
+        if k: self.places.append((k, n.location.lat, n.location.lon))
 
     def way(self, w):
         t = dict(w.tags)
         if not t: return
+        # Toilets mapped as a building or an area: at its middle.
+        k = place(t)
+        if k and len(w.nodes) > 3 and w.nodes[0].ref == w.nodes[-1].ref:
+            try:
+                ring = [(n.lat, n.lon) for n in w.nodes][:-1]
+                self.places.append((k, sum(p[0] for p in ring) / len(ring), sum(p[1] for p in ring) / len(ring)))
+            except osmium.InvalidLocationError:
+                pass
         run, g, a = runnable(t), green(t, False), avoid(t)
         nat = t.get('natural')
         shore = nat in ('coastline', 'beach', 'sand', 'cliff')
@@ -211,9 +244,14 @@ def beach_paths(coast, beaches, cliffs, ways, ras, next_id):
     return out
 
 
-def graph(ways, src=None):
-    """src: a list filled, beside each segment, with the index of the way it came from."""
-    """Segments between junctions and way ends; the points between them stay as the segment's shape."""
+def graph(ways, src=None, stops=None, stopped=None):
+    """
+    Segments between junctions and way ends; the points between them stay as
+    the segment's shape. src: a list filled, beside each segment, with the
+    index of the way it came from. stopped: a list filled, beside each, with
+    its (lights, crossings) in halves — whole inside it, half at each end,
+    where it meets the next — from stops (node id: LIGHT or CROSSING).
+    """
     uses = {}
     for ids, _, _, _ in ways:
         last = len(ids) - 1
@@ -227,6 +265,12 @@ def graph(ways, src=None):
                 if any(p != shape[0] for p in shape):
                     edges.append((shape, cls, lit))
                     if src is not None: src.append(w)
+                    if stopped is not None:
+                        got = [0, 0]
+                        for j in range(start, i + 1):
+                            k = (stops or {}).get(ids[j])
+                            if k: got[0 if k == LIGHT else 1] += 1 if start < j < i else 0.5
+                        stopped.append((round(got[0] * 2), round(got[1] * 2)))
                 start = i
     return edges
 
@@ -311,6 +355,7 @@ def encode(row, col, edges):
 
 
 HEIGHTS_FORMAT = 1
+EXTRAS_FORMAT = 1    # EXTRAS.md: stops per segment, and places
 
 def encode_heights(row, col, edges, heights):
     """
@@ -331,6 +376,47 @@ def encode_heights(row, col, edges, heights):
     for _, _, up, down in heights:
         varint(out, up); varint(out, down)
     return bytes(out)
+
+
+def encode_extras(row, col, stopped, places):
+    """
+    One area's extras (EXTRAS.md): each segment's lights and crossings in
+    halves, in the order of its map file (encode); then its places, sorted
+    so the file is the same for the same map.
+    """
+    out = bytearray(b'PZX' + bytes([EXTRAS_FORMAT]))
+    varint(out, row); varint(out, col); varint(out, len(stopped))
+    for lights, crossings in stopped:
+        varint(out, lights); varint(out, crossings)
+    varint(out, len(places))
+    pla = plo = 0
+    for kind, la, lo in sorted(places):
+        out.append(kind)
+        varint(out, zigzag(la - pla)); varint(out, zigzag(lo - plo)); pla, plo = la, lo
+    return bytes(out)
+
+
+def decode_extras(raw):
+    """An extras file back: (row, col, [(lights, crossings)…], [(kind, lat, lon)…]), in millionths."""
+    assert raw[:3] == b'PZX' and raw[3] == EXTRAS_FORMAT
+    i = 4
+    def uv():
+        nonlocal i
+        v = s = 0
+        while True:
+            b = raw[i]; i += 1
+            v |= (b & 0x7f) << s; s += 7
+            if b < 0x80: return v
+    zz = lambda v: (v >> 1) ^ -(v & 1)
+    row, col, n = uv(), uv(), uv()
+    stopped = [(uv(), uv()) for _ in range(n)]
+    places, la, lo = [], 0, 0
+    for _ in range(uv()):
+        kind = raw[i]; i += 1
+        la += zz(uv()); lo += zz(uv())
+        places.append((kind, la, lo))
+    assert i == len(raw), 'extras: bytes left over'
+    return row, col, stopped, places
 
 
 def decode_heights(raw):
@@ -400,8 +486,9 @@ def build(pbf, out, dem=None, lights=None):
     ras = Raster(lats.min() - .01, lons.min() - .01, lats.max() + .01, lons.max() + .01)
     shore = beach_paths(r.coast, r.beaches, r.cliffs, r.ways, ras, -1)
     print(f'beach paths: {sum(1 for w in shore if len(w[0]) > 2)} stretches, {sum(1 for w in shore if len(w[0]) == 2)} joins, {time.time() - t0:.0f}s', flush=True)
-    src = []
-    edges = graph(r.ways + shore, src)
+    src, stopped = [], []
+    edges = graph(r.ways + shore, src, r.stops, stopped)
+    print(f'stops: {sum(1 for v in r.stops.values() if v == LIGHT)} lights, {sum(1 for v in r.stops.values() if v == CROSSING)} crossings; places: {len(r.places)}', flush=True)
     paved = r.paved + [False] * len(shore)
     del r.ways
     print(f'graph: {len(edges)} segments; raster {ras.W}×{ras.H}, {time.time() - t0:.0f}s', flush=True)
@@ -432,6 +519,7 @@ def build(pbf, out, dem=None, lights=None):
 
     tiles = {}
     tiles_h = {}
+    tiles_x = {}
     for k, ((shape, cls, lit), gs, av) in enumerate(zip(edges, g, a)):
         pts = [(round(la * Q), round(lo * Q)) for la, lo in shape]
         la, lo = np.array([p[0] for p in shape]), np.array([p[1] for p in shape])
@@ -442,6 +530,11 @@ def build(pbf, out, dem=None, lights=None):
         if dem is not None:
             # In decimetres, beside the edge in its area's list, so both files keep one order.
             tiles_h.setdefault(key, []).append((round(z0[k] * 10), round(z1[k] * 10), round(up[k] * 10), round(down[k] * 10)))
+        tiles_x.setdefault(key, []).append(stopped[k])
+    # Each place in the area it stands in; an area with no paths has no file, and its places no runner reaches.
+    places_in = {}
+    for kind, la, lo in r.places:
+        places_in.setdefault((math.floor(la / TILE), math.floor(lo / TILE)), []).append((kind, round(la * Q), round(lo * Q)))
 
     os.makedirs(f'{out}/t', exist_ok=True)
     index = {}
@@ -460,6 +553,13 @@ def build(pbf, out, dem=None, lights=None):
             gz = gzip.compress(raw, 9, mtime=0)
             with open(f'{out}/h/{row}_{col}.bin.gz', 'wb') as f: f.write(gz)
             index_h[f'{row}_{col}'] = [len(gz), hashlib.sha256(raw).hexdigest()[:12]]
+    index_x = {}
+    os.makedirs(f'{out}/x', exist_ok=True)
+    for (row, col), es in sorted(tiles.items()):
+        raw = encode_extras(row, col, tiles_x[(row, col)], places_in.get((row, col), []))
+        gz = gzip.compress(raw, 9, mtime=0)
+        with open(f'{out}/x/{row}_{col}.bin.gz', 'wb') as f: f.write(gz)
+        index_x[f'{row}_{col}'] = [len(gz), hashlib.sha256(raw).hexdigest()[:12]]
     meta = {
         'format': FORMAT, 'tile': TILE, 'built': datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ'), 'osm': stamp,
         # Where the extract came from (MAP_SOURCE, set by the job): Geofabrik's covers more than its fallback's, so check.py compares like with like.
@@ -472,6 +572,8 @@ def build(pbf, out, dem=None, lights=None):
         meta['heights'] = {'format': HEIGHTS_FORMAT, 'attribution': ATTRIBUTION, 'tiles': index_h}
     if lights is not None:
         meta['lights'] = {'attribution': street_lights.ATTRIBUTION}
+    # Stops and places (EXTRAS.md): a file of their own, so phones that don't read them aren't touched.
+    meta['extras'] = {'format': EXTRAS_FORMAT, 'tiles': index_x}
     with open(f'{out}/index.json', 'w') as f: json.dump(meta, f, separators=(',', ':'))
     big = sorted(index.items(), key=lambda kv: -kv[1][0])[:3]
     print(f'wrote {len(index)} areas, {total / 1e6:.1f} MB in all; largest {[(k, round(v[0] / 1e3)) for k, v in big]} KB; {time.time() - t0:.0f}s')

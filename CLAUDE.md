@@ -26,6 +26,10 @@ and its `lib/core/mapdata.ts` reads these files.
   a path, track or footway 80% or more on a mapped beach or sand and not
   paved, or tagged `surface=sand`, is `beach` — about 22,000 segments,
   dunes included. A path by Wingate along the water wasn't "on the sand".
+- **Extras: stops and places** (`x/`, EXTRAS.md; the owner, 2026-10-23,
+  for Pretzel's "fewer traffic lights" and water and toilets along a run):
+  a file per area beside the map, like the heights, so phones that don't
+  read it aren't touched; the segments in the map file's order.
 - **Street lights from Tel Aviv-Yafo** (`lights.py`; the owner, 2026-10-19,
   under the city's open data terms: share and adapt for any purpose, with
   credit — the layer is on its map server, not in its open data catalogue).
