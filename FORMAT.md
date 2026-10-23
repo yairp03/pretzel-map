@@ -59,7 +59,9 @@ Coordinates are in millionths of a degree (about 11 cm).
 - Car one-way streets are not marked: a runner may run either way.
 - **The class `beach` is not an OpenStreetMap way.** OpenStreetMap has
   no path along the water on most beaches, so the job makes one: the
-  coastline where it runs along a beach or sand (within 40 m), 12 m onto
+  coastline where it lies on a mapped beach or sand (no slack: a coast
+  drawn as a long straight stroke across a curving shore lies in the sea
+  there, and gets no path), 12 m onto
   the sand, gaps of up to 300 m between beaches bridged, in stretches of
   200 m or more; and short `beach` segments joining it to the runnable
   ways that reach the sand (each such way's node to the nearest point
