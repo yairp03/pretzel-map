@@ -26,6 +26,12 @@ and its `lib/core/mapdata.ts` reads these files.
   a path, track or footway 80% or more on a mapped beach or sand and not
   paved, or tagged `surface=sand`, is `beach` — about 22,000 segments,
   dunes included. A path by Wingate along the water wasn't "on the sand".
+  **The shore counts only where it lies on mapped sand** (`SHORE_GROW = 0`,
+  2026-10-23): OpenStreetMap draws some coasts as long straight strokes
+  across a curving shore — 2.3 km across north Netanya — and with 40 m of
+  slack the path along that stroke ran 20–50 m out in the sea, in the
+  owner's saved route. A coast drawn straight because it *is* straight
+  (Ashdod) lies on its beach and keeps its path. `test_no_beach_path_in_the_sea`.
 - **Extras: stops and places** (`x/`, EXTRAS.md; the owner, 2026-10-23,
   for Pretzel's "fewer traffic lights" and water and toilets along a run):
   a file per area beside the map, like the heights, so phones that don't

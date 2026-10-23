@@ -54,6 +54,11 @@ class Built(unittest.TestCase):
         length = sum(s['dm'] for k, s in self.beach() if s in along) / 10
         self.assertAlmostEqual(length, 660, delta=40)
 
+    def test_no_beach_path_in_the_sea(self):
+        # A coastline stroke beside a beach, not on it: no path along it (the owner's saved route ran 20–50 m out
+        # in the sea off north Netanya, 2026-10-23).
+        self.assertEqual([k for k, s in self.beach() if 32.289 < k[0] < 32.297 or 32.289 < k[2] < 32.297], [])
+
     def test_beach_path_joined_to_a_path_down_to_the_sand(self):
         joins = [k for k, s in self.beach() if (32.3065, 34.853) in (k[:2], k[2:])]
         self.assertEqual(len(joins), 1)

@@ -144,6 +144,11 @@ SHORE_STEP = 20     # metres between the beach path's points
 SHORE_IN = 12       # metres onto the sand from the waterline (OpenStreetMap draws the coastline with the land on its left)
 MIN_RUN = 200       # metres: shorter stretches of beach are not worth a path
 SHORE_GAP = 300     # metres of unmapped shore bridged between two beaches
+# Cells (20 m each) a beach is grown by when asking whether the shore is on the sand: none. Grown by 40 m, a
+# coastline OpenStreetMap draws as one straight 2.3 km stroke across north Netanya's curving shore counted as
+# sand, and the path drawn along it ran 20–50 m out in the sea (the owner's saved route, 2026-10-23). With none:
+# that stretch 2.24 km → 0.26 km; Argaman–Poleg 3.90 → 3.84, Tel Aviv 5.00 → 4.67, all of Israel 170 → 149 km.
+SHORE_GROW = 0
 ACCESS = 120        # metres: how far a path ending on the sand may be joined to the beach path
 ACCESS_EVERY = 150  # metres along the beach path between two joins
 
@@ -160,14 +165,14 @@ def beach_paths(coast, beaches, cliffs, ways, ras, next_id):
     Netanya's coast, from Argaman to Poleg beach, about 1.9 km of broken bits
     in 3 km, so routes never went on the sand (the owner, 2026-10-15, chose to
     add it, in normal routes). The coastline where it runs along a beach or
-    sand (within 40 m), moved 12 m onto the sand, gaps of up to 300 m between
+    sand, moved 12 m onto the sand, gaps of up to 300 m between
     beaches bridged, cut into stretches of 200 m or more, and joined to the runnable ways that reach the sand: each way's
     node on the beach to the nearest point of the path within 120 m, one join
     every 150 m, never across a mapped cliff. Returned as ways for graph():
     (node ids, points, class, lit) — ids below zero, made here; lit = no.
     """
     if not coast or not beaches: return []
-    mask = ras.image(beaches, (), 2, 0)
+    mask = ras.image(beaches, (), SHORE_GROW, 0)
     on_sand = lambda la, lo: 0 <= (y := int((la - ras.la0) / ras.dy)) < ras.H and 0 <= (x := int((lo - ras.lo0) / ras.dx)) < ras.W and mask[y, x]
     kx = 111320 * math.cos(math.radians(ras.la0))
     plane = lambda la, lo: (lo * kx, la * 111320)
