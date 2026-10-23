@@ -14,6 +14,7 @@ pip install -r requirements.txt
 python -m unittest -v                     # on test_map.osm, a small map drawn by hand
 python lights.py lights.json              # Tel Aviv-Yafo's street-light poles (lights.py)
 python build.py israel.osm.pbf site dem lights.json   # all of Israel, with heights (HEIGHTS.md) and lights: 20 MB out
+python names.py israel.osm.pbf site      # place names for where a run starts (NAMES.md): after build.py
 python check.py site                      # what the job checks before publishing
 ```
 

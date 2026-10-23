@@ -26,6 +26,9 @@ for name in new['tiles']:
     assert name in new['extras']['tiles'], f'{name} has no extras'
     with open(f'{out}/x/{name}.bin.gz', 'rb') as f: xrow, xcol, stopped, _ = decode_extras(gzip.decompress(f.read()))
     assert (xrow, xcol, len(stopped)) == (row, col, len(segs)), f'{name}: extras don’t match the map'
+# The place names (NAMES.md): there, and with about as many towns as Israel has (194 on 2026-10-23).
+with open(f'{out}/names.json') as f: towns = len(json.load(f)['towns'])
+assert towns >= 150 and new.get('names', {}).get('hash'), f'names.json: {towns} towns'
 size = sum(v[0] for v in new['tiles'].values())
 print(f'{len(new["tiles"])} areas, {segments} segments, {size / 1e6:.1f} MB: all read back' + (', heights too' if 'heights' in new else '') + ', extras too')
 

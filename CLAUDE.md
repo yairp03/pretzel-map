@@ -39,6 +39,11 @@ and its `lib/core/mapdata.ts` reads these files.
   poles aren't in the layer) — no pole is not dark. Credited in
   `index.json` and on the app's About. A week the city doesn't answer, the
   job builds with the last copy in its cache.
+- **Place names** (`names.py` → `names.json`, NAMES.md; the owner,
+  2026-10-23: saved routes and runs should say where they started): town
+  boundaries and place points, so the phone names a start with nothing
+  sent anywhere. Regional councils are left out (a kibbutz is named for
+  itself).
 - **Pages for this account redirects to yairp.me** (the account's own Pages
   site carries that domain), so this repo's Pages must keep its custom
   domain, map.pretzel.yairp.me (a CNAME to yairp03.github.io at Vercel's DNS).

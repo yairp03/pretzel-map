@@ -78,4 +78,19 @@
   <way id="120" version="1"><nd ref="88"/><nd ref="89"/><tag k="highway" v="footway"/><tag k="surface" v="paving_stones"/></way>
   <way id="121" version="1"><nd ref="92"/><nd ref="93"/><nd ref="94"/><nd ref="95"/><nd ref="92"/><tag k="amenity" v="toilets"/><tag k="building" v="yes"/></way>
   <relation id="201" version="1"><member type="way" ref="111" role="outer"/><tag k="type" v="multipolygon"/><tag k="natural" v="wood"/></relation>
+  <!-- Names (names.py): a town's boundary, a regional council's around it (left out), a neighbourhood inside the town, a village outside. -->
+  <node id="301" version="1" lat="32.298" lon="34.858"/>
+  <node id="302" version="1" lat="32.298" lon="34.876"/>
+  <node id="303" version="1" lat="32.312" lon="34.876"/>
+  <node id="304" version="1" lat="32.312" lon="34.858"/>
+  <node id="311" version="1" lat="32.290" lon="34.850"/>
+  <node id="312" version="1" lat="32.290" lon="34.890"/>
+  <node id="313" version="1" lat="32.330" lon="34.890"/>
+  <node id="314" version="1" lat="32.330" lon="34.850"/>
+  <node id="305" version="1" lat="32.305" lon="34.865"><tag k="place" v="neighbourhood"/><tag k="name" v="שכונת מבחן"/><tag k="name:en" v="Test Quarter"/></node>
+  <node id="306" version="1" lat="32.320" lon="34.880"><tag k="place" v="village"/><tag k="name" v="כפר מבחן"/><tag k="name:en" v="Test Village"/></node>
+  <way id="310" version="1"><nd ref="301"/><nd ref="302"/><nd ref="303"/><nd ref="304"/><nd ref="301"/></way>
+  <way id="315" version="1"><nd ref="311"/><nd ref="312"/><nd ref="313"/><nd ref="314"/><nd ref="311"/></way>
+  <relation id="320" version="1"><member type="way" ref="310" role="outer"/><tag k="type" v="boundary"/><tag k="boundary" v="administrative"/><tag k="admin_level" v="8"/><tag k="name" v="עיר מבחן"/><tag k="name:en" v="Test Town"/></relation>
+  <relation id="321" version="1"><member type="way" ref="315" role="outer"/><tag k="type" v="boundary"/><tag k="boundary" v="administrative"/><tag k="admin_level" v="8"/><tag k="name" v="מועצה אזורית מבחן"/><tag k="name:en" v="Test Regional Council"/></relation>
 </osm>
