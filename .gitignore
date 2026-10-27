@@ -1,3 +1,6 @@
 *.osm.pbf
 site/
 __pycache__/
+extracts/
+dem-abroad/
+out/

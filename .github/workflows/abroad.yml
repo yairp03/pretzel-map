@@ -1,0 +1,77 @@
+# Cities abroad (ABROAD.md): each city of abroad.json built from its country's
+# extract, once a month — their streets change slowly, and the weekly job
+# stays Israel's. Kept as the release "abroad" (abroad.tar.gz), which the
+# weekly job (map.yml) merges into the map it publishes; then that job is run,
+# so a month's cities don't wait for Monday.
+name: Abroad
+on:
+  schedule:
+    - cron: '41 2 2 * *'   # the 2nd of each month, 02:41 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write   # the release
+  actions: write    # running the weekly job after
+
+concurrency:
+  group: abroad
+  cancel-in-progress: false
+
+jobs:
+  city:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false   # a city that fails keeps last month's build (pack)
+      matrix:
+        city: [athens, thessaloniki, larnaca, limassol, rome, milan, paris, london, barcelona, berlin, budapest, prague, vienna, amsterdam, new-york]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: pip
+      - run: pip install -r requirements.txt
+      # To cut the city out of its country first: Python reading all of Czechia would take many minutes.
+      - run: sudo apt-get update -q && sudo apt-get install -y -q osmium-tool
+      - run: python abroad.py city ${{ matrix.city }} out/${{ matrix.city }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: city-${{ matrix.city }}
+          path: out/${{ matrix.city }}
+          retention-days: 7
+
+  pack:
+    needs: city
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: city-*
+          path: built
+      - name: This month's cities, and last month's where one failed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p prev pack
+          if gh release download abroad -p abroad.tar.gz -D prev-dl; then tar -xzf prev-dl/abroad.tar.gz -C prev; fi
+          for id in $(python -c "import json; print(' '.join(c['id'] for c in json.load(open('abroad.json'))['cities']))"); do
+            if [ -f "built/city-$id/city.json" ]; then cp -r "built/city-$id" "pack/$id"; echo "$id: this month"
+            elif [ -f "prev/$id/city.json" ]; then cp -r "prev/$id" "pack/$id"; echo "$id: LAST MONTH'S (this month's failed)"
+            else echo "$id: NONE"; fi
+          done
+          test "$(ls pack | wc -l)" -ge 1
+          tar -czf abroad.tar.gz -C pack .
+          ls -l abroad.tar.gz
+      - name: The release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view abroad >/dev/null 2>&1 || gh release create abroad --title "Cities abroad" --notes "Built monthly by .github/workflows/abroad.yml; merged into the map by map.yml (ABROAD.md). Map data © OpenStreetMap contributors, ODbL."
+          gh release upload abroad abroad.tar.gz --clobber
+      - name: Publish the map with them
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run map.yml

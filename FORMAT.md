@@ -42,7 +42,7 @@ Coordinates are in millionths of a degree (about 11 cm).
 
 | Part | Contents |
 |---|---|
-| header | `PZM` and the format number as one byte (1); varint row, varint col |
+| header | `PZM` and the format number as one byte (1); varint row, varint col — a negative one (west of Greenwich, south of the equator: ABROAD.md) as 2³² + v, so every area of Israel's is the same bytes as ever |
 | vertices | varint count; per vertex, zigzag latitude and zigzag longitude, each as the difference from the previous vertex (the first from 0) |
 | segments | varint count; per segment: varint `a`, varint `b` (vertex numbers in this file), then four bytes — class, lit (0 unknown, 1 yes, 2 no), green (0–255), avoided (0–255) — then varint length in decimetres, varint count of shape points, and per shape point a zigzag latitude and longitude difference from the point before (the first from vertex `a`) |
 

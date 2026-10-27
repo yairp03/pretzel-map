@@ -182,3 +182,35 @@ class Lights(unittest.TestCase):
         self.assertEqual((out[0][2], changed), (0, 0))
         out, changed = lit_by_poles([tuple(way)], [(32.30005, 34.86 + i * 0.0002) for i in range(31)])
         self.assertEqual((out[0][2], changed), (1, 1))
+
+
+class Abroad(unittest.TestCase):
+    """Cities abroad (ABROAD.md): areas west of Greenwich or south of the equator, a city cut from its country's extract, heights there."""
+
+    def test_a_negative_area_reads_back_and_israel_is_unchanged(self):
+        from build import encode, encode_extras, encode_heights, varint
+        edge = [([(51507400, -128400), (51507500, -127400)], CLASS['footway'], 0, 0, 0, 70)]
+        row, col, verts, segs = decode(encode(1030, -3, edge))
+        self.assertEqual((row, col, len(segs)), (1030, -3, 1))
+        self.assertEqual(decode_heights(encode_heights(-7, -3, edge, [(0, 0, 0, 0)]))[:2], (-7, -3))
+        self.assertEqual(decode_extras(encode_extras(1030, -3, [(0, 0)], []))[:2], (1030, -3))
+        # An area of Israel: the same bytes as before the change (varint row, varint col straight after the magic).
+        head = []; varint(head, 646); varint(head, 697)
+        self.assertEqual(encode(646, 697, edge)[4:4 + len(head)], bytes(head))
+
+    def test_a_box_keeps_only_what_reaches_into_it(self):
+        d = tempfile.mkdtemp()
+        build(os.path.join(HERE, 'test_map.osm'), d, box=(32.30, 34.80, 32.40, 34.90))
+        with open(f'{d}/index.json') as f: tiles = json.load(f)['tiles']
+        self.assertEqual(sorted(tiles), ['646_697'])
+
+    def test_heights_west_of_greenwich(self):
+        import numpy as np, rasterio
+        from rasterio.transform import from_origin
+        d = tempfile.mkdtemp()
+        # A 1° tile over London, 100 m everywhere.
+        with rasterio.open(f'{d}/N51W001.tif', 'w', driver='GTiff', height=10, width=10, count=1, dtype='float32', transform=from_origin(-1, 52, 0.1, 0.1)) as ds:
+            ds.write(np.full((1, 10, 10), 100, np.float32))
+        h = Heights.from_dir(d)
+        self.assertAlmostEqual(float(h.at([51.5], [-0.5])[0]), 100, 3)
+        self.assertEqual(float(h.at([51.5], [0.5])[0]), 0)

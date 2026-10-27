@@ -1,0 +1,20 @@
+{
+  "km": 12,
+  "cities": [
+    { "id": "athens", "he": "אתונה", "en": "Athens", "at": [37.9755, 23.735], "extract": "europe/greece" },
+    { "id": "thessaloniki", "he": "סלוניקי", "en": "Thessaloniki", "at": [40.6323, 22.9409], "extract": "europe/greece" },
+    { "id": "larnaca", "he": "לרנקה", "en": "Larnaca", "at": [34.9125, 33.6368], "extract": "europe/cyprus" },
+    { "id": "limassol", "he": "לימסול", "en": "Limassol", "at": [34.6696, 33.0402], "extract": "europe/cyprus" },
+    { "id": "rome", "he": "רומא", "en": "Rome", "at": [41.8962, 12.4824], "extract": "europe/italy/centro" },
+    { "id": "milan", "he": "מילאנו", "en": "Milan", "at": [45.4639, 9.1906], "extract": "europe/italy/nord-ovest" },
+    { "id": "paris", "he": "פריז", "en": "Paris", "at": [48.8564, 2.3525], "extract": "europe/france/ile-de-france" },
+    { "id": "london", "he": "לונדון", "en": "London", "at": [51.5074, -0.1284], "extract": "europe/united-kingdom/england/greater-london" },
+    { "id": "barcelona", "he": "ברצלונה", "en": "Barcelona", "at": [41.3878, 2.1702], "extract": "europe/spain/cataluna" },
+    { "id": "berlin", "he": "ברלין", "en": "Berlin", "at": [52.5163, 13.3777], "extract": "europe/germany/berlin" },
+    { "id": "budapest", "he": "בודפשט", "en": "Budapest", "at": [47.4977, 19.0538], "extract": "europe/hungary" },
+    { "id": "prague", "he": "פראג", "en": "Prague", "at": [50.0874, 14.421], "extract": "europe/czech-republic" },
+    { "id": "vienna", "he": "וינה", "en": "Vienna", "at": [48.2085, 16.372], "extract": "europe/austria" },
+    { "id": "amsterdam", "he": "אמסטרדם", "en": "Amsterdam", "at": [52.3731, 4.8924], "extract": "europe/netherlands/noord-holland" },
+    { "id": "new-york", "he": "ניו יורק", "en": "New York", "at": [40.7678, -73.9823], "extract": "north-america/us/new-york" }
+  ]
+}

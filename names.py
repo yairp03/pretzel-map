@@ -53,16 +53,23 @@ def simplify(ring, tol):
 
 
 class Reader(osmium.SimpleHandler):
-    def __init__(self):
+    """`box`: (south, west, north, east), only what is in it (a city abroad, ABROAD.md)."""
+    def __init__(self, box=None):
         super().__init__()
+        self.box = box
         self.towns, self.places = [], []
+
+    def inside(self, lat, lon):
+        if not self.box: return True
+        s, w, n, e = self.box
+        return s <= lat <= n and w <= lon <= e
 
     def node(self, n):
         t = n.tags
         kind = t.get('place')
         if kind not in SETTLEMENT and kind not in AREA: return
         nm = names(t)
-        if nm: self.places.append([round(n.location.lon, 5), round(n.location.lat, 5), *nm, 's' if kind in SETTLEMENT else 'n'])
+        if nm and self.inside(n.location.lat, n.location.lon): self.places.append([round(n.location.lon, 5), round(n.location.lat, 5), *nm, 's' if kind in SETTLEMENT else 'n'])
 
     def area(self, a):
         t = a.tags
@@ -73,11 +80,16 @@ class Reader(osmium.SimpleHandler):
         for ring in a.outer_rings():
             pts = simplify([(round(p.lon, 5), round(p.lat, 5)) for p in ring], TOLERANCE)
             if len(pts) >= 4: rings.append(pts)
+        # A town reaching into the box: its whole outline, so a start in it is named.
+        if rings and self.box and not any(self.inside(la, lo) for r in rings for lo, la in r):
+            s_, w_, n_, e_ = self.box
+            los, las = [p[0] for r in rings for p in r], [p[1] for r in rings for p in r]
+            if min(las) > n_ or max(las) < s_ or min(los) > e_ or max(los) < w_: return
         if rings: self.towns.append({'he': nm[0], 'en': nm[1], 'rings': rings})
 
 
-def make(pbf, out):
-    r = Reader()
+def make(pbf, out, box=None):
+    r = Reader(box)
     r.apply_file(pbf, locations=True, idx='flex_mem')
     r.towns.sort(key=lambda x: x['en'])
     r.places.sort(key=lambda p: (p[3], p[0]))

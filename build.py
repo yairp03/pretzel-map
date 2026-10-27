@@ -70,9 +70,18 @@ PAVED = {'paved', 'asphalt', 'concrete', 'concrete:plates', 'concrete:lanes', 'p
 SANDY = {'path', 'track', 'footway', 'other'}
 
 
+def touches(box, pts):
+    """Whether a line or ring reaches into the box (south, west, north, east); no box, everything does."""
+    if box is None: return True
+    s, w, n, e = box
+    return (min(p[0] for p in pts) <= n and max(p[0] for p in pts) >= s and min(p[1] for p in pts) <= e and max(p[1] for p in pts) >= w)
+
+
 class Reader(osmium.SimpleHandler):
-    def __init__(self):
+    """`box`: only what reaches into it (a city abroad, cut from its country's extract: ABROAD.md)."""
+    def __init__(self, box=None):
         super().__init__()
+        self.box = box
         self.ways = []                 # (node ids, (lat, lon) of each, class, lit)
         self.paved = []                # beside each way: its surface is paved (or wood…), or it is a path tagged sand: 'sand'
         self.green_areas, self.green_lines, self.avoid_areas = [], [], []
@@ -82,6 +91,7 @@ class Reader(osmium.SimpleHandler):
 
     def node(self, n):
         if not n.tags: return
+        if self.box and not touches(self.box, [(n.location.lat, n.location.lon)]): return
         t = dict(n.tags)
         k = stop(t)
         if k: self.stops[n.id] = k
@@ -96,7 +106,7 @@ class Reader(osmium.SimpleHandler):
         if k and len(w.nodes) > 3 and w.nodes[0].ref == w.nodes[-1].ref:
             try:
                 ring = [(n.lat, n.lon) for n in w.nodes][:-1]
-                self.places.append((k, sum(p[0] for p in ring) / len(ring), sum(p[1] for p in ring) / len(ring)))
+                if touches(self.box, ring): self.places.append((k, sum(p[0] for p in ring) / len(ring), sum(p[1] for p in ring) / len(ring)))
             except osmium.InvalidLocationError:
                 pass
         run, g, a = runnable(t), green(t, False), avoid(t)
@@ -107,6 +117,7 @@ class Reader(osmium.SimpleHandler):
             pts = [(n.lat, n.lon) for n in w.nodes]
         except osmium.InvalidLocationError:
             return
+        if not touches(self.box, pts): return
         if nat == 'coastline': self.coast.append(pts)
         elif nat == 'cliff': self.cliffs.append(pts)
         elif nat in ('beach', 'sand') and len(pts) > 3 and pts[0] == pts[-1]: self.beaches.append(pts)
@@ -128,7 +139,7 @@ class Reader(osmium.SimpleHandler):
         if not (g or v or sand): return
         for ring in a.outer_rings():
             pts = [(n.lat, n.lon) for n in ring]
-            if len(pts) > 3:
+            if len(pts) > 3 and touches(self.box, pts):
                 if g or v: (self.green_areas if g else self.avoid_areas).append(pts)
                 if sand: self.beaches.append(pts)
 
@@ -333,6 +344,14 @@ def varint(out, v):
         out.append((v & 0x7F) | 0x80); v >>= 7
     out.append(v)
 
+def u32(v):
+    """A row or column as the header holds it (FORMAT.md): as it is, or a negative one (west of Greenwich, south of the
+    equator) as 2³² + v — so every area of Israel's map is the same bytes as before, and old phones read it as they did."""
+    return v & 0xFFFFFFFF
+
+def s32(v):
+    return v - (1 << 32) if v >= 1 << 31 else v
+
 def zigzag(v):
     return v * 2 if v >= 0 else -v * 2 - 1
 
@@ -343,7 +362,7 @@ def encode(row, col, edges):
         for p in (shape[0], shape[-1]):
             if p not in vid: vid[p] = len(verts); verts.append(p)
     out = bytearray(b'PZM' + bytes([FORMAT]))
-    varint(out, row); varint(out, col); varint(out, len(verts))
+    varint(out, u32(row)); varint(out, u32(col)); varint(out, len(verts))
     px = (0, 0)
     for p in verts:
         varint(out, zigzag(p[0] - px[0])); varint(out, zigzag(p[1] - px[1])); px = p
@@ -373,7 +392,7 @@ def encode_heights(row, col, edges, heights):
         for p, z in ((shape[0], z0), (shape[-1], z1)):
             if p not in vid: vid[p] = len(verts); verts.append(z)
     out = bytearray(b'PZH' + bytes([HEIGHTS_FORMAT]))
-    varint(out, row); varint(out, col); varint(out, len(verts))
+    varint(out, u32(row)); varint(out, u32(col)); varint(out, len(verts))
     prev = 0
     for z in verts:
         varint(out, zigzag(z - prev)); prev = z
@@ -390,7 +409,7 @@ def encode_extras(row, col, stopped, places):
     so the file is the same for the same map.
     """
     out = bytearray(b'PZX' + bytes([EXTRAS_FORMAT]))
-    varint(out, row); varint(out, col); varint(out, len(stopped))
+    varint(out, u32(row)); varint(out, u32(col)); varint(out, len(stopped))
     for lights, crossings in stopped:
         varint(out, lights); varint(out, crossings)
     varint(out, len(places))
@@ -413,7 +432,7 @@ def decode_extras(raw):
             v |= (b & 0x7f) << s; s += 7
             if b < 0x80: return v
     zz = lambda v: (v >> 1) ^ -(v & 1)
-    row, col, n = uv(), uv(), uv()
+    row, col, n = s32(uv()), s32(uv()), uv()
     stopped = [(uv(), uv()) for _ in range(n)]
     places, la, lo = [], 0, 0
     for _ in range(uv()):
@@ -435,7 +454,7 @@ def decode_heights(raw):
             b = raw[i]; i += 1; v |= (b & 0x7F) << sh; sh += 7
             if b < 0x80: return v
     zz = lambda: (lambda v: -(v + 1) // 2 if v & 1 else v // 2)(uv())
-    row, col = uv(), uv()
+    row, col = s32(uv()), s32(uv())
     z, verts = 0, []
     for _ in range(uv()):
         z += zz(); verts.append(z)
@@ -455,7 +474,7 @@ def decode(raw):
             b = raw[i]; i += 1; v |= (b & 0x7F) << sh; sh += 7
             if b < 0x80: return v
     zz = lambda: (lambda v: -(v + 1) // 2 if v & 1 else v // 2)(uv())
-    row, col = uv(), uv()
+    row, col = s32(uv()), s32(uv())
     verts, la, lo = [], 0, 0
     for _ in range(uv()):
         la += zz(); lo += zz(); verts.append((la, lo))
@@ -471,17 +490,18 @@ def decode(raw):
     return row, col, verts, segs
 
 
-def build(pbf, out, dem=None, lights=None):
+def build(pbf, out, dem=None, lights=None, box=None):
     """
     dem: a folder of height tiles, or a Heights (tests); none, no heights
     files. lights: street-light poles (lights.py), a file of them or a list
-    of (lat, lon); none, the map's own lit tags only.
+    of (lat, lon); none, the map's own lit tags only. box: (south, west,
+    north, east), only the ways reaching into it (a city abroad: ABROAD.md).
     """
     import os
     import lights as street_lights
     from heights import ATTRIBUTION, Heights, climbs
     t0 = time.time()
-    r = Reader()
+    r = Reader(box)
     r.apply_file(pbf, locations=True, idx='flex_mem')
     stamp = osmium.io.Reader(pbf, osmium.osm.osm_entity_bits.NOTHING).header().get('osmosis_replication_timestamp', '')
     print(f'read: {len(r.ways)} ways, {len(r.green_areas)} green areas, {len(r.green_lines)} green lines, {len(r.avoid_areas)} avoided areas, {len(r.beaches)} beaches, {time.time() - t0:.0f}s', flush=True)

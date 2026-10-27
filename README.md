@@ -18,6 +18,13 @@ python names.py israel.osm.pbf site      # place names for where a run starts (N
 python check.py site                      # what the job checks before publishing
 ```
 
+Fifteen cities abroad are built monthly beside it (`abroad.py`, `.github/workflows/abroad.yml`; ABROAD.md):
+
+```
+python abroad.py city london out/london   # one city: its country's extract, cut and built
+python abroad.py merge site out/*          # into the weekly map
+```
+
 Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright),
 available under the Open Database License (ODbL); the files here are a
 database derived from it, under the same licence.

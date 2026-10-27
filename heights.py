@@ -37,13 +37,16 @@ class Heights:
         import rasterio
         tiles = {}
         for path in sorted(glob.glob(os.path.join(d, '*.tif'))):
-            m = re.search(r'N(\d+)E(\d+)', os.path.basename(path))
+            # N32E034, or anywhere: S… is south of the equator, W… west of Greenwich (cities abroad, ABROAD.md).
+            m = re.search(r'([NS])(\d+)([EW])(\d+)', os.path.basename(path))
             if not m: continue
+            la = int(m.group(2)) * (1 if m.group(1) == 'N' else -1)
+            lo = int(m.group(4)) * (1 if m.group(3) == 'E' else -1)
             with rasterio.open(path) as ds:
                 a = ds.read(1).astype(np.float32)
                 a[~np.isfinite(a) | (a < -100)] = 0
                 # Inverse transform: row, col of a point (pixel centres).
-                tiles[(int(m.group(1)), int(m.group(2)))] = (_blur(a), ~ds.transform)
+                tiles[(la, lo)] = (_blur(a), ~ds.transform)
         return cls(tiles)
 
     @classmethod
@@ -55,12 +58,13 @@ class Heights:
         lat, lon = np.asarray(lat, float), np.asarray(lon, float)
         if self.fn: return np.asarray(self.fn(lat, lon), float)
         out = np.zeros(lat.shape)
-        keys = np.floor(lat).astype(int) * 1000 + np.floor(lon).astype(int)
-        for key in np.unique(keys):
-            t = self.tiles.get((int(key // 1000), int(key % 1000)))
+        # Each point's 1° tile, as (lat, lon) — west and south of zero too, which one number of lat·1000 + lon mixed up.
+        tl, tn = np.floor(lat).astype(int), np.floor(lon).astype(int)
+        for la, lo in {(int(x), int(y)) for x, y in zip(tl.ravel(), tn.ravel())}:
+            t = self.tiles.get((la, lo))
             if t is None: continue
             a, inv = t
-            sel = keys == key
+            sel = (tl == la) & (tn == lo)
             col, row = inv * (lon[sel], lat[sel])
             col, row = np.asarray(col) - 0.5, np.asarray(row) - 0.5
             r0 = np.clip(np.floor(row).astype(int), 0, a.shape[0] - 2)

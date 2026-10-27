@@ -50,6 +50,12 @@ and its `lib/core/mapdata.ts` reads these files.
   boundaries and place points, so the phone names a start with nothing
   sent anywhere. Regional councils are left out (a kibbutz is named for
   itself).
+- **Cities abroad** (`abroad.py`, `abroad.json`, ABROAD.md; the owner,
+  2026-10-27: 15 cities, 12 km round each centre, monthly): built one per
+  job from country extracts, kept as the release `abroad`, merged by the
+  weekly job. Israel's files are byte for byte what they were; negative
+  rows and columns are 2³² + v in the headers, which old phones never ask
+  for.
 - **Pages for this account redirects to yairp.me** (the account's own Pages
   site carries that domain), so this repo's Pages must keep its custom
   domain, map.pretzel.yairp.me (a CNAME to yairp03.github.io at Vercel's DNS).
