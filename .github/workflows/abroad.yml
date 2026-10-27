@@ -1,13 +1,19 @@
-# Cities abroad (ABROAD.md): each city of abroad.json built from its country's
+# Places abroad (ABROAD.md): each place of abroad.json built from its country's
 # extract, once a month — their streets change slowly, and the weekly job
-# stays Israel's. Kept as the release "abroad" (abroad.tar.gz), which the
-# weekly job (map.yml) merges into the map it publishes; then that job is run,
-# so a month's cities don't wait for Monday.
+# stays Israel's. One job per extract, downloaded once for all its places.
+# Kept as the release "abroad" (abroad.tar.gz), which the weekly job (map.yml)
+# publishes as regions beside Israel's; then that job is run, so a month's
+# places don't wait for Monday.
 name: Abroad
 on:
   schedule:
     - cron: '41 2 2 * *'   # the 2nd of each month, 02:41 UTC
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Update the release and publish the map (off: only build, to try a change)'
+        type: boolean
+        default: true
 
 permissions:
   contents: write   # the release
@@ -18,13 +24,24 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  city:
+  plan:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    outputs:
+      extracts: ${{ steps.list.outputs.extracts }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: list
+        run: echo "extracts=$(python3 -c "import json; print(json.dumps(sorted({c['extract'] for c in json.load(open('abroad.json'))['cities']})))")" >> "$GITHUB_OUTPUT"
+
+  extract:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
     strategy:
-      fail-fast: false   # a city that fails keeps last month's build (pack)
+      fail-fast: false   # a place that fails keeps last month's build (pack)
+      max-parallel: 20
       matrix:
-        city: [athens, thessaloniki, larnaca, limassol, rome, milan, paris, london, barcelona, berlin, budapest, prague, vienna, amsterdam, new-york]
+        extract: ${{ fromJSON(needs.plan.outputs.extracts) }}
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -34,23 +51,26 @@ jobs:
       - run: pip install -r requirements.txt
       # To cut the city out of its country first: Python reading all of Czechia would take many minutes.
       - run: sudo apt-get update -q && sudo apt-get install -y -q osmium-tool
-      - run: python abroad.py city ${{ matrix.city }} out/${{ matrix.city }}
+      - run: python abroad.py extract ${{ matrix.extract }} out
+      - id: slug
+        run: echo "slug=$(echo '${{ matrix.extract }}' | tr / _)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@v4
         with:
-          name: city-${{ matrix.city }}
-          path: out/${{ matrix.city }}
+          name: extract-${{ steps.slug.outputs.slug }}
+          path: out
           retention-days: 7
 
   pack:
-    needs: city
+    needs: extract
     if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v4
         with:
-          pattern: city-*
+          pattern: extract-*
           path: built
+          merge-multiple: true
       - name: This month's cities, and last month's where one failed
         env:
           GH_TOKEN: ${{ github.token }}
@@ -58,7 +78,7 @@ jobs:
           mkdir -p prev pack
           if gh release download abroad -p abroad.tar.gz -D prev-dl; then tar -xzf prev-dl/abroad.tar.gz -C prev; fi
           for id in $(python -c "import json; print(' '.join(c['id'] for c in json.load(open('abroad.json'))['cities']))"); do
-            if [ -f "built/city-$id/city.json" ]; then cp -r "built/city-$id" "pack/$id"; echo "$id: this month"
+            if [ -f "built/$id/city.json" ]; then cp -r "built/$id" "pack/$id"; echo "$id: this month"
             elif [ -f "prev/$id/city.json" ]; then cp -r "prev/$id" "pack/$id"; echo "$id: LAST MONTH'S (this month's failed)"
             else echo "$id: NONE"; fi
           done
@@ -66,12 +86,14 @@ jobs:
           tar -czf abroad.tar.gz -C pack .
           ls -l abroad.tar.gz
       - name: The release
+        if: github.event_name == 'schedule' || inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release view abroad >/dev/null 2>&1 || gh release create abroad --title "Cities abroad" --notes "Built monthly by .github/workflows/abroad.yml; merged into the map by map.yml (ABROAD.md). Map data © OpenStreetMap contributors, ODbL."
+          gh release view abroad >/dev/null 2>&1 || gh release create abroad --title "Places abroad" --notes "Built monthly by .github/workflows/abroad.yml; published by map.yml as regions (ABROAD.md). Map data © OpenStreetMap contributors, ODbL."
           gh release upload abroad abroad.tar.gz --clobber
       - name: Publish the map with them
+        if: github.event_name == 'schedule' || inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run map.yml

@@ -70,17 +70,19 @@ jobs:
           ls -l lights
       - run: python build.py israel.osm.pbf site dem $( [ -s lights/tel-aviv.json ] && echo lights/tel-aviv.json )
       - run: python names.py israel.osm.pbf site
-      # The cities abroad (ABROAD.md): built monthly by abroad.yml, kept as the release "abroad"; none yet, Israel alone.
-      - name: Cities abroad
+      # The regions (FORMAT.md → "Regions"): Israel, and the places abroad (ABROAD.md), built monthly by abroad.yml and
+      # kept as the release "abroad"; with none, Israel alone.
+      - name: Regions
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          mkdir -p abroad
           if gh release download abroad -p abroad.tar.gz -D abroad-dl -R "$GITHUB_REPOSITORY"; then
-            mkdir abroad && tar -xzf abroad-dl/abroad.tar.gz -C abroad
-            python abroad.py merge site abroad/*
+            tar -xzf abroad-dl/abroad.tar.gz -C abroad
           else
-            echo "No cities abroad yet: Israel alone."
+            echo "No places abroad yet: Israel alone."
           fi
+          python abroad.py regions site $(ls -d abroad/*/ 2>/dev/null)
       - run: python check.py site
       - uses: actions/upload-pages-artifact@v4
         with:

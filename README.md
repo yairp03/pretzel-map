@@ -18,11 +18,13 @@ python names.py israel.osm.pbf site      # place names for where a run starts (N
 python check.py site                      # what the job checks before publishing
 ```
 
-Fifteen cities abroad are built monthly beside it (`abroad.py`, `.github/workflows/abroad.yml`; ABROAD.md):
+Fifty places abroad are built monthly beside it (`abroad.py`, `.github/workflows/abroad.yml`; ABROAD.md), and
+published as regions (FORMAT.md → "Regions"):
 
 ```
-python abroad.py city london out/london   # one city: its country's extract, cut and built
-python abroad.py merge site out/*          # into the weekly map
+python abroad.py city london out/london          # one place: its country's extract, cut and built
+python abroad.py extract europe/greece out       # every place of one extract
+python abroad.py regions site out/*/             # Israel and the places, as regions, into the weekly map
 ```
 
 Map data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright),

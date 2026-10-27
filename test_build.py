@@ -204,6 +204,47 @@ class Abroad(unittest.TestCase):
         with open(f'{d}/index.json') as f: tiles = json.load(f)['tiles']
         self.assertEqual(sorted(tiles), ['646_697'])
 
+    def test_places_apart(self):
+        """No two places of abroad.json share an area (`regions` refuses it), and each has an extract and both names."""
+        from abroad import box_for, cities
+        conf = cities()
+        boxes = [(c['id'], box_for(c, conf['km'])) for c in conf['cities']]
+        self.assertEqual(len({i for i, _ in boxes}), len(boxes))
+        for c in conf['cities']: self.assertTrue(c['he'] and c['en'] and c['extract'], c['id'])
+        for i, (a, p) in enumerate(boxes):
+            for b, q in boxes[i + 1:]:
+                self.assertFalse(p[0] - 0.1 < q[2] and q[0] - 0.1 < p[2] and p[1] - 0.1 < q[3] and q[1] - 0.1 < p[3], f'{a} and {b}')
+
+    def test_regions(self):
+        """Israel and a place as regions: each one's index and names, hashed as regions.json says; Israel's index.json as it was."""
+        import hashlib, shutil
+        from abroad import regions
+        site, place = tempfile.mkdtemp(), tempfile.mkdtemp()
+        build(os.path.join(HERE, 'test_map.osm'), site)
+        with open(f'{site}/names.json', 'w') as f: json.dump({'format': 1, 'towns': [], 'places': []}, f)
+        with open(f'{site}/index.json') as f: before = f.read()
+        # A place: one area of the test map, under another name (west of Greenwich).
+        name = next(iter(json.loads(before)['tiles']))
+        for kind in ('t', 'x'):
+            os.makedirs(f'{place}/{kind}')
+            shutil.copy(f'{site}/{kind}/{name}.bin.gz', f'{place}/{kind}/1030_-3.bin.gz')
+        ix = json.loads(before)
+        with open(f'{place}/index.json', 'w') as f: json.dump({'tiles': {'1030_-3': ix['tiles'][name]}, 'extras': {'tiles': {'1030_-3': ix['extras']['tiles'][name]}}}, f)
+        with open(f'{place}/names.json', 'w') as f: json.dump({'format': 1, 'towns': [], 'places': [[-0.13, 51.5, 'לונדון', 'London', 's']]}, f)
+        with open(f'{place}/city.json', 'w') as f: json.dump({'id': 'london', 'he': 'לונדון', 'en': 'London', 'at': [51.5, -0.13], 'box': [51.4, -0.3, 51.6, 0.0], 'osm': '', 'built': 'x'}, f)
+        regions(site, [place])
+        with open(f'{site}/index.json') as f: self.assertEqual(f.read(), before)
+        with open(f'{site}/regions.json') as f: reg = json.load(f)
+        self.assertEqual([r['id'] for r in reg['regions']], ['israel', 'london'])
+        for r in reg['regions']:
+            with open(f'{site}/r/{r["id"]}.json', 'rb') as f: self.assertEqual(hashlib.sha256(f.read()).hexdigest()[:12], r['index']['hash'])
+            with open(f'{site}/n/{r["id"]}.json', 'rb') as f: self.assertEqual(hashlib.sha256(f.read()).hexdigest()[:12], r['names']['hash'])
+        with open(f'{site}/r/london.json') as f: self.assertEqual(list(json.load(f)['tiles']), ['1030_-3'])
+        self.assertTrue(os.path.exists(f'{site}/t/1030_-3.bin.gz'))
+        # The same place twice: refused, as one would replace the other's areas.
+        os.remove(f'{site}/regions.json')
+        with self.assertRaises(AssertionError): regions(site, [place, place])
+
     def test_heights_west_of_greenwich(self):
         import numpy as np, rasterio
         from rasterio.transform import from_origin
