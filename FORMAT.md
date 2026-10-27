@@ -33,6 +33,42 @@ contributors, ODbL.
   it, every 10 m (`lights.py`); a tag of OpenStreetMap's is never
   overruled, and no segment is made unlit by them.
 
+Since the regions (below), `index.json` is Israel's alone, as phones on
+an app from before them read it.
+
+## Regions: `regions.json`, `r/<id>.json`, `n/<id>.json`
+
+The map is Israel and fifty places abroad (ABROAD.md). One index of them
+all, fetched on every opening, would grow with each place for a runner who
+never leaves Tel Aviv (the owner, 2026-10-27). So the phone fetches a small
+list of regions, and only the regions it is near (`abroad.py regions`):
+
+```json
+{
+  "format": 1, "map": 1, "tile": 0.05, "classes": [...], "attribution": "...",
+  "heights": { "format": 1, "attribution": "..." }, "extras": { "format": 1 }, "names": { "format": 1 },
+  "lights": { "attribution": "..." }, "built": "...",
+  "regions": [
+    { "id": "israel", "he": "ישראל", "en": "Israel", "at": [lat, lon], "box": [s, w, n, e],
+      "osm": "...", "built": "...", "source": "...", "areas": 1249, "bytes": 20112345,
+      "index": { "hash": "…", "bytes": …, "gzip": … }, "names": { "hash": "…", "bytes": …, "gzip": … } },
+    …
+  ]
+}
+```
+
+- `map`: the area files' format (`index.json`'s `format`); `format` is
+  this file's own.
+- A region's `box` holds all its areas; `at` is where it is named for (a
+  city's centre, an island's main town).
+- `r/<id>.json`: the region's areas as `index.json` lists them, its
+  heights' and extras' too: `{"tiles": {…}, "heights": {…}, "extras":
+  {…}}`. `n/<id>.json`: its place names (NAMES.md). Each is fetched again
+  only when its `hash` changes (SHA-256 of the file, 12 hex digits).
+- No area is in two regions (`regions` refuses it; `check.py` checks it).
+- Israel is the first region, and its `r/` file lists exactly
+  `index.json`'s areas; its `n/` file is `names.json`.
+
 ## `t/<row>_<col>.bin.gz`
 
 Gzip, then bytes. A *varint* is an unsigned LEB128 number (7 bits a byte,
