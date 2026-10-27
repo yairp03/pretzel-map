@@ -9,6 +9,11 @@ on:
   schedule:
     - cron: '41 2 2 * *'   # the 2nd of each month, 02:41 UTC
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Update the release and publish the map (off: only build, to try a change)'
+        type: boolean
+        default: true
 
 permissions:
   contents: write   # the release
@@ -81,12 +86,14 @@ jobs:
           tar -czf abroad.tar.gz -C pack .
           ls -l abroad.tar.gz
       - name: The release
+        if: github.event_name == 'schedule' || inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release view abroad >/dev/null 2>&1 || gh release create abroad --title "Places abroad" --notes "Built monthly by .github/workflows/abroad.yml; published by map.yml as regions (ABROAD.md). Map data © OpenStreetMap contributors, ODbL."
           gh release upload abroad abroad.tar.gz --clobber
       - name: Publish the map with them
+        if: github.event_name == 'schedule' || inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh workflow run map.yml
