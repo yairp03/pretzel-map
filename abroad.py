@@ -78,7 +78,10 @@ def city(cid, out, extracts='extracts'):
     make(cut, out, box)
     with open(f'{out}/index.json') as f: index = json.load(f)
     if len(index['tiles']) < 10: sys.exit(f'{cid}: only {len(index["tiles"])} areas')
-    meta = {k: c[k] for k in ('id', 'he', 'en', 'at')} | {'box': list(box), 'osm': index.get('osm', ''), 'built': index['built']}
+    # The data's date from the country's extract: the cut file's header doesn't carry it.
+    import osmium
+    stamp = index.get('osm') or osmium.io.Reader(pbf, osmium.osm.osm_entity_bits.NOTHING).header().get('osmosis_replication_timestamp', '')
+    meta = {k: c[k] for k in ('id', 'he', 'en', 'at')} | {'box': list(box), 'osm': stamp, 'built': index['built']}
     with open(f'{out}/city.json', 'w') as f: json.dump(meta, f, ensure_ascii=False)
     print(f'{cid}: {len(index["tiles"])} areas, {sum(v[0] for v in index["tiles"].values()) / 1e6:.1f} MB')
 
