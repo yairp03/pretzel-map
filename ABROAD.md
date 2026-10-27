@@ -8,7 +8,12 @@ each way: a square about 24 km across.
 - **Built monthly** by `.github/workflows/abroad.yml`, one job per city:
   its country's Geofabrik extract, cut to the square (`osmium extract`),
   built as Israel is (`abroad.py city` → `build.py` with a `box`, the same
-  rules, heights from Copernicus GLO-30, extras, names). A city that fails
+  rules, extras, names) — **but no heights**: Copernicus GLO-30 is the
+  surface, roofs included, and in an old city's narrow streets they bleed
+  in (flat Whitehall climbed 19 m in 700 m, Tel Aviv's Dizengoff 6 m); a
+  route there shows no climb rather than a wrong one. FABDEM, the same
+  with buildings taken out, is non-commercial and its server failed
+  downloads (heights.py). A city that fails
   keeps last month's build.
 - **Kept as the release `abroad`** (`abroad.tar.gz`, a folder per city
   with its own `index.json` and `city.json`), not in the repo's history.
@@ -29,5 +34,4 @@ each way: a square about 24 km across.
   each city needs 10 areas or more.
 - Sizes (2026-10-27): Larnaca 24 areas, 0.5 MB; London 50 areas, 6.9 MB.
 
-Map data © OpenStreetMap contributors, ODbL; heights from Copernicus GLO-30,
-credited as `heights.py` says.
+Map data © OpenStreetMap contributors, ODbL.

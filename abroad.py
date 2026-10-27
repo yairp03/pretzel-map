@@ -2,7 +2,7 @@
 centre, cut from its country's Geofabrik extract and built as Israel is;
 then merged into the weekly map.
 
-    python abroad.py city <id> <out dir> [extracts dir] [dem dir]   # one city, as the monthly job builds it
+    python abroad.py city <id> <out dir> [extracts dir]   # one city, as the monthly job builds it
     python abroad.py merge <site> <city dir>…                     # into the map the weekly job publishes
 
 Each city is built on its own: built together, the map's 20 m grids for
@@ -41,19 +41,14 @@ def fetch(url, path):
     return True
 
 
-def dem_tiles(box, dem):
-    """Copernicus GLO-30's 1° tiles over the box (as the weekly job fetches Israel's), named N51W001.tif and so on."""
-    os.makedirs(dem, exist_ok=True)
-    s, w, n, e = box
-    for la in range(math.floor(s), math.floor(n) + 1):
-        for lo in range(math.floor(w), math.floor(e) + 1):
-            ns, ew = f'{"N" if la >= 0 else "S"}{abs(la):02d}', f'{"E" if lo >= 0 else "W"}{abs(lo):03d}'
-            name = f'Copernicus_DSM_COG_10_{ns}_00_{ew}_00_DEM'
-            # Over the sea there is no tile: none fetched, heights 0 there.
-            fetch(f'https://copernicus-dem-30m.s3.amazonaws.com/{name}/{name}.tif', os.path.join(dem, f'{ns}{ew}.tif'))
-
-
-def city(cid, out, extracts='extracts', dem='dem-abroad'):
+def city(cid, out, extracts='extracts'):
+    """
+    No heights abroad (2026-10-27): Copernicus GLO-30 is the surface, roofs
+    included, and in an old city's narrow streets they bleed in — flat
+    Whitehall climbed 19 m in 700 m, against 6 m along Tel Aviv's
+    Dizengoff; London's flat routes came out "hilly". With no heights files
+    the phone shows no climb for a route there, rather than a wrong one.
+    """
     from build import build
     from names import make
     conf = cities()
@@ -70,9 +65,8 @@ def city(cid, out, extracts='extracts', dem='dem-abroad'):
         cut = os.path.join(extracts, f'{cid}.osm.pbf')
         s, w, n, e = box
         subprocess.run(['osmium', 'extract', '-b', f'{w},{s},{e},{n}', '-s', 'complete_ways', '--overwrite', '-o', cut, pbf], check=True)
-    dem_tiles(box, dem)
     os.environ['MAP_SOURCE'] = src
-    build(cut, out, dem, None, box)
+    build(cut, out, None, None, box)
     make(cut, out, box)
     with open(f'{out}/index.json') as f: index = json.load(f)
     if len(index['tiles']) < 10: sys.exit(f'{cid}: only {len(index["tiles"])} areas')

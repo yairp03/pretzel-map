@@ -23,12 +23,14 @@ def israel(index):
     return {k: v for k, v in index['tiles'].items() if not abroad(k)}
 
 segments = 0
+il = israel(new)
 for name in new['tiles']:
     with open(f'{out}/t/{name}.bin.gz', 'rb') as f: row, col, verts, segs = decode(gzip.decompress(f.read()))
     assert f'{row}_{col}' == name, f'{name} says it is {row}_{col}'
     segments += len(segs)
     # Its heights, when there are any: the same area, the same vertices and segments (the phone pairs them by position).
-    if 'heights' in new:
+    # (Israel's areas: the cities abroad have none — ABROAD.md.)
+    if 'heights' in new and name in il:
         assert name in new['heights']['tiles'], f'{name} has no heights'
         with open(f'{out}/h/{name}.bin.gz', 'rb') as f: hrow, hcol, z, climbs = decode_heights(gzip.decompress(f.read()))
         assert (hrow, hcol, len(z), len(climbs)) == (row, col, len(verts), len(segs)), f'{name}: heights don’t match the map'
